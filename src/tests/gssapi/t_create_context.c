@@ -103,6 +103,8 @@ t_gss_create_delete_integration()
     maj_stat = gss_create_sec_context(&min_stat, &context);
     check_gsserr("t_gss_create_delete_integration()", maj_stat, min_stat);
 
+    assert(context != GSS_C_NO_CONTEXT);
+
     maj_stat = gss_delete_sec_context(&min_stat, &context, NULL);
     check_gsserr("t_gss_create_delete_integration()", maj_stat, min_stat);
 
