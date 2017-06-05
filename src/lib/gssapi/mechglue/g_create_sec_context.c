@@ -37,7 +37,7 @@ gss_ctx_id_t *context;
 
     *minor_status = 0;
 
-    ctx = calloc(sizeof(stub_gss_ctx_id_rec), 0);
+    ctx = calloc(sizeof(stub_gss_ctx_id_rec), 1);
     if (ctx == NULL)
         return GSS_S_UNAVAILABLE;
 
