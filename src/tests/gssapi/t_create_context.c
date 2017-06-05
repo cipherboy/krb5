@@ -9,9 +9,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#include <gssapi/gssapi_ext.h>
 
+#include "k5-int.h"
 #include "common.h"
+#include "mglueP.h"
+#include "gssapiP_krb5.h"
 
 static int
 t_gss_create_context()
@@ -19,6 +21,7 @@ t_gss_create_context()
     OM_uint32 maj_stat;
     OM_uint32 min_stat;
     gss_ctx_id_t context = GSS_C_NO_CONTEXT;
+    gss_union_ctx_id_t union_check;
     stub_gss_ctx_id_rec *check;
     gss_ctx_id_t *context_handle = NULL;
 
@@ -28,13 +31,19 @@ t_gss_create_context()
     maj_stat = gss_create_sec_context(&min_stat, &context);
     check_gsserr("t_gss_create_context()", maj_stat, min_stat);
     assert(context != GSS_C_NO_CONTEXT);
-    check = (stub_gss_ctx_id_rec *)context;
-    assert(check != NULL);
+
+    union_check = (gss_union_ctx_id_t)context;
+    assert(union_check != NULL);
+    assert(union_check == union_check->loopback);
+    assert(union_check->internal_ctx_id != NULL);
+
+    check = (stub_gss_ctx_id_rec *)union_check->internal_ctx_id;
     assert(check->magic_num == STUB_MAGIC_ID);
     assert(check->req_flags == 0);
     assert(check->ret_flags == 0);
 
     free(check);
+    free(union_check);
     check = NULL;
 
     maj_stat = gss_create_sec_context(&min_stat, context_handle);
@@ -50,13 +59,19 @@ t_gss_create_context()
     check_gsserr("t_gss_create_context()", maj_stat, min_stat);
 
     assert(*context_handle != NULL);
-    check = (stub_gss_ctx_id_rec *)(*context_handle);
-    assert(check != NULL);
+
+    union_check = (gss_union_ctx_id_t)(*context_handle);
+    assert(union_check != NULL);
+    assert(union_check == union_check->loopback);
+    assert(union_check->internal_ctx_id != NULL);
+
+    check = (stub_gss_ctx_id_rec *)union_check->internal_ctx_id;
     assert(check->magic_num == STUB_MAGIC_ID);
     assert(check->req_flags == 0);
     assert(check->ret_flags == 0);
 
     free(check);
+    free(union_check);
     free(context_handle);
 
     return 0;
@@ -68,6 +83,7 @@ t_gss_set_context_flags()
     OM_uint32 maj_stat;
     OM_uint32 min_stat;
     gss_ctx_id_t context = GSS_C_NO_CONTEXT;
+    gss_union_ctx_id_t union_check;
     stub_gss_ctx_id_rec *check;
 
     maj_stat = gss_set_context_flags(&min_stat, context, 1, 2);
@@ -79,7 +95,12 @@ t_gss_set_context_flags()
     maj_stat = gss_set_context_flags(&min_stat, context, 1, 2);
     check_gsserr("t_gss_set_context_flags()", maj_stat, min_stat);
 
-    check = (stub_gss_ctx_id_rec *)context;
+    union_check = (gss_union_ctx_id_t)context;
+    assert(union_check != NULL);
+    assert(union_check == union_check->loopback);
+    assert(union_check->internal_ctx_id != NULL);
+
+    check = (stub_gss_ctx_id_rec *)union_check->internal_ctx_id;
     assert(check != NULL);
     assert(check->magic_num == STUB_MAGIC_ID);
     assert(check->req_flags == 1);
@@ -105,7 +126,7 @@ t_gss_create_delete_integration()
 
     assert(context != GSS_C_NO_CONTEXT);
 
-    maj_stat = gss_delete_sec_context(&min_stat, &context, NULL);
+    maj_stat = gss_delete_sec_context(&min_stat, &context, GSS_C_NO_BUFFER);
     check_gsserr("t_gss_create_delete_integration()", maj_stat, min_stat);
 
     return 0;
