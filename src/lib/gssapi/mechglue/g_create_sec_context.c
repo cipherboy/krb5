@@ -15,6 +15,14 @@
 #ifndef LEAN_CLIENT
 
 
+/*
+ * Defined:
+ * https://tools.ietf.org/html/draft-ietf-kitten-channel-bound-flag-01
+ *
+ * Section 2.1
+ * 
+ * See src/lib/gssapi/generic/gssapi_ext.h for type definitions.
+ */
 OM_uint32 KRB5_CALLCONV
 gss_create_sec_context (minor_status,
                         context)
@@ -22,28 +30,20 @@ gss_create_sec_context (minor_status,
 OM_uint32    *minor_status;
 gss_ctx_id_t *context;
 {
-    OM_uint32 status_out = GSS_S_FAILURE;
-    gss_OID selected_mech_type = GSS_C_NO_OID;
-    gss_mechanism mech = NULL;
+    stub_gss_ctx_id_rec *ctx;
 
-    if (minor_status != NULL)
-        *minor_status = 0;
+    *minor_status = 0;
 
-
-    status_out = gssint_select_mech_type(minor_status, GSS_C_NO_OID, &selected_mech_type);
-
-    if (status_out != GSS_S_COMPLETE)
-        return status_out;
-
-    mech = gssint_get_mechanism(selected_mech_type);
-
-    if (mech == NULL)
-        return GSS_S_BAD_MECH;
-
-    if (mech->gss_create_sec_context == NULL)
+    ctx = calloc(sizeof(stub_gss_ctx_id_rec), 0);
+    if (ctx == NULL) {
         return GSS_S_UNAVAILABLE;
+    }
 
-    return mech->gss_create_sec_context(minor_status, context);
+    ctx->magic_num = STUB_MAGIC_ID;
+
+    context = (gss_ctx_id_t *)ctx;
+
+    return GSS_S_COMPLETE;
 }
 
 #endif
