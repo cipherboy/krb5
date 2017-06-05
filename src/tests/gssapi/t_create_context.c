@@ -13,11 +13,8 @@
 
 #include "common.h"
 
-int t_gss_create_context(void);
-int t_gss_set_context_flags(void);
-
-int
-t_gss_create_context(void)
+static int
+t_gss_create_context()
 {
     OM_uint32 maj_stat;
     OM_uint32 min_stat;
@@ -45,6 +42,7 @@ t_gss_create_context(void)
 
     context_handle = malloc(sizeof(gss_ctx_id_t));
     if (context_handle == NULL) {
+        fprintf(stderr, "MALLOC failed. OOM.\n");
         return 1;
     }
 
@@ -64,8 +62,8 @@ t_gss_create_context(void)
     return 0;
 }
 
-int
-t_gss_set_context_flags(void)
+static int
+t_gss_set_context_flags()
 {
     OM_uint32 maj_stat;
     OM_uint32 min_stat;
@@ -95,18 +93,31 @@ t_gss_set_context_flags(void)
     return 0;
 }
 
+static int
+t_gss_create_delete_integration()
+{
+    OM_uint32 maj_stat;
+    OM_uint32 min_stat;
+    gss_ctx_id_t context = GSS_C_NO_CONTEXT;
+
+    maj_stat = gss_create_sec_context(&min_stat, &context);
+    check_gsserr("t_gss_create_delete_integration()", maj_stat, min_stat);
+
+    maj_stat = gss_delete_sec_context(&min_stat, &context, NULL);
+    check_gsserr("t_gss_create_delete_integration()", maj_stat, min_stat);
+
+    return 0;
+}
+
 int
 main(int argc, char *argv[])
 {
-    int call_val = 0;
+    assert(t_gss_create_context() == 0);
+    printf("t_gss_create_context()... ok\n");
 
-    call_val = t_gss_create_context();
-    if (call_val != 0) {
-        return 1;
-    }
+    assert(t_gss_set_context_flags() == 0);
+    printf("t_gss_set_context_flags()... ok\n");
 
-    call_val = t_gss_set_context_flags();
-    if (call_val != 0) {
-        return 1;
-    }
+    assert(t_gss_create_delete_integration() == 0);
+    printf("t_gss_create_delete_integration()... ok\n");
 }
