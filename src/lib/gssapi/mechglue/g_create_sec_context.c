@@ -32,16 +32,17 @@ gss_ctx_id_t *context;
 {
     stub_gss_ctx_id_rec *ctx;
 
+    if (context == NULL)
+        return GSS_S_FAILURE;
+
     *minor_status = 0;
 
     ctx = calloc(sizeof(stub_gss_ctx_id_rec), 0);
-    if (ctx == NULL) {
+    if (ctx == NULL)
         return GSS_S_UNAVAILABLE;
-    }
 
     ctx->magic_num = STUB_MAGIC_ID;
-
-    context = (gss_ctx_id_t *)ctx;
+    *context = (gss_ctx_id_t)ctx;
 
     return GSS_S_COMPLETE;
 }
