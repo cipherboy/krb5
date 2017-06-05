@@ -34,13 +34,19 @@ gss_ctx_id_t  context;
 uint64_t      req_flags;
 uint64_t      ret_flags;
 {
+    gss_union_ctx_id_t union_ctx;
     stub_gss_ctx_id_rec *ctx;
 
     if (context == NULL) {
         return GSS_S_FAILURE;
     }
 
-    ctx = (stub_gss_ctx_id_rec *)context;
+    union_ctx = (gss_union_ctx_id_t)context;
+    if (GSSINT_CHK_LOOP(union_ctx)) {
+        return GSS_S_FAILURE;
+    }
+
+    ctx = (stub_gss_ctx_id_rec *)union_ctx->internal_ctx_id;
 
     if (ctx == NULL) {
         return GSS_S_FAILURE;
