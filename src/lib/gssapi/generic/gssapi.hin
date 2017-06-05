@@ -432,11 +432,6 @@ gss_release_cred(
     gss_cred_id_t *);   /* cred_handle */
 
 OM_uint32 KRB5_CALLCONV
-gss_create_sec_context(
-    OM_uint32 *,        /* minor_status */
-    gss_ctx_id_t *);    /* context */
-
-OM_uint32 KRB5_CALLCONV
 gss_init_sec_context(
     OM_uint32 *,        /* minor_status */
     gss_cred_id_t,      /* claimant_cred_handle */
