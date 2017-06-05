@@ -30,6 +30,7 @@ gss_create_sec_context(minor_status,
 OM_uint32    *minor_status;
 gss_ctx_id_t *context;
 {
+    gss_union_ctx_id_t union_ctx;
     stub_gss_ctx_id_rec *ctx;
 
     if (context == NULL)
@@ -37,12 +38,23 @@ gss_ctx_id_t *context;
 
     *minor_status = 0;
 
-    ctx = calloc(sizeof(stub_gss_ctx_id_rec), 1);
-    if (ctx == NULL)
+    union_ctx = calloc(sizeof(gss_union_ctx_id_desc), 1);
+    if (union_ctx == NULL)
         return GSS_S_UNAVAILABLE;
 
+    ctx = calloc(sizeof(stub_gss_ctx_id_rec), 1);
+    if (ctx == NULL) {
+        free(union_ctx);
+        return GSS_S_UNAVAILABLE;
+    }
+
     ctx->magic_num = STUB_MAGIC_ID;
-    *context = (gss_ctx_id_t)ctx;
+
+    union_ctx->loopback = union_ctx;
+    union_ctx->mech_type = GSS_C_NO_OID;
+    union_ctx->internal_ctx_id = (gss_ctx_id_t)ctx;
+
+    *context = (gss_ctx_id_t)union_ctx;
 
     return GSS_S_COMPLETE;
 }
