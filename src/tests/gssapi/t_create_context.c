@@ -14,6 +14,7 @@
 #include "common.h"
 
 int t_gss_create_context(void);
+int t_gss_set_context_flags(void);
 
 int
 t_gss_create_context(void)
@@ -25,7 +26,7 @@ t_gss_create_context(void)
     gss_ctx_id_t *context_handle = NULL;
 
     maj_stat = gss_create_sec_context(&min_stat, NULL);
-    assert(maj_stat == GSS_S_FAILURE);
+    assert(maj_stat != GSS_S_COMPLETE);
 
     maj_stat = gss_create_sec_context(&min_stat, &context);
     check_gsserr("t_gss_create_context()", maj_stat, min_stat);
@@ -40,7 +41,7 @@ t_gss_create_context(void)
     check = NULL;
 
     maj_stat = gss_create_sec_context(&min_stat, context_handle);
-    assert(maj_stat = GSS_S_FAILURE);
+    assert(maj_stat != GSS_S_COMPLETE);
 
     context_handle = malloc(sizeof(gss_ctx_id_t));
     if (context_handle == NULL) {
@@ -64,11 +65,47 @@ t_gss_create_context(void)
 }
 
 int
+t_gss_set_context_flags(void)
+{
+    OM_uint32 maj_stat;
+    OM_uint32 min_stat;
+    gss_ctx_id_t context = GSS_C_NO_CONTEXT;
+    stub_gss_ctx_id_rec *check;
+
+    maj_stat = gss_set_context_flags(&min_stat, context, 1, 2);
+    assert(maj_stat != GSS_S_COMPLETE);
+
+    maj_stat = gss_create_sec_context(&min_stat, &context);
+    check_gsserr("t_gss_set_context_flags()", maj_stat, min_stat);
+
+    maj_stat = gss_set_context_flags(&min_stat, context, 1, 2);
+    check_gsserr("t_gss_set_context_flags()", maj_stat, min_stat);
+
+    check = (stub_gss_ctx_id_rec *)context;
+    assert(check != NULL);
+    assert(check->magic_num == STUB_MAGIC_ID);
+    assert(check->req_flags == 1);
+    assert(check->ret_flags == 2);
+    free(check);
+
+    context = NULL;
+    maj_stat = gss_set_context_flags(&min_stat, context, 1, 2);
+    assert(maj_stat != GSS_S_COMPLETE);
+
+    return 0;
+}
+
+int
 main(int argc, char *argv[])
 {
     int call_val = 0;
 
     call_val = t_gss_create_context();
+    if (call_val != 0) {
+        return 1;
+    }
+
+    call_val = t_gss_set_context_flags();
     if (call_val != 0) {
         return 1;
     }
