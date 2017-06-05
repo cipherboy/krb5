@@ -587,12 +587,12 @@ typedef struct _stub_gss_ctx_id_rec {
 } stub_gss_ctx_id_rec, *stub_gss_ctx_id_t;
 
 OM_uint32 KRB5_CALLCONV
-gss_create_sec_Context(
+gss_create_sec_context(
     OM_uint32 *,                /* minor_status */
     gss_ctx_id_t *);            /* context */
 
 
-OM_uint32
+OM_uint32 KRB5_CALLCONV
 gss_set_context_flags(
     OM_uint32 *,                /* minor_status */
     gss_ctx_id_t,               /* context */
