@@ -701,12 +701,6 @@ typedef struct gss_config {
 	    gss_iov_buffer_desc *,	/* iov */
 	    int				/* iov_count */
 	);
-
-        OM_uint32       (KRB5_CALLCONV *gss_create_sec_context)
-        (
-            OM_uint32 *,                /* minor status */
-            gss_ctx_id_t *              /* context */
-        );
 } *gss_mechanism;
 
 /*
