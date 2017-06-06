@@ -120,6 +120,7 @@ OM_uint32 *		time_rec;
     gss_OID		selected_mech;
     gss_mechanism	mech;
     gss_cred_id_t	input_cred_handle;
+    OM_uint32           used_req_flags;
 
     status = val_init_sec_ctx_args(minor_status,
 				   claimant_cred_handle,
@@ -171,6 +172,10 @@ OM_uint32 *		time_rec;
 	    return (status);
     }
 
+    /* Set up helper variables for channel binding extension processing */
+    potential_union = (gss_union_ctx_id_t)(*context_handle);
+    used_req_flags = req_flags;
+
     /*
      * if context_handle is GSS_C_NO_CONTEXT, allocate a union context
      * descriptor to hold the mech type information as well as the
@@ -178,7 +183,6 @@ OM_uint32 *		time_rec;
      * value of *context_handle to the union context variable.
      */
 
-    potential_union = (gss_union_ctx_id_t)(*context_handle);
     if(*context_handle == GSS_C_NO_CONTEXT) {
 	status = GSS_S_FAILURE;
 	union_ctx_id = (gss_union_ctx_id_t)
@@ -200,6 +204,10 @@ OM_uint32 *		time_rec;
         if (generic_gss_copy_oid(&temp_minor_status, selected_mech, 
                                  &union_ctx_id->mech_type) != GSS_S_COMPLETE) {
             goto end;
+        }
+
+        if (used_req_flags == 0) {
+            used_req_flags = ((stub_gss_ctx_id_t)(potential_union->initial_ctx_id))->req_flags;
         }
     } else {
 	union_ctx_id = (gss_union_ctx_id_t)*context_handle;
@@ -223,7 +231,7 @@ OM_uint32 *		time_rec;
 	&union_ctx_id->internal_ctx_id,
 	internal_name,
 	gssint_get_public_oid(selected_mech),
-	req_flags,
+	used_req_flags,
 	time_req,
 	input_chan_bindings,
 	input_token,
@@ -261,6 +269,11 @@ end:
 	union_name->mech_name != internal_name) {
 	(void) gssint_release_internal_name(&temp_minor_status,
 					    selected_mech, &internal_name);
+    }
+
+    if (ret_flags != NULL && GSSINT_CHK_STUB(potential_union)
+        && potential_union->initial_ctx_id != NULL) {
+        *ret_flags &= ((stub_gss_ctx_id_t)(potential_union->initial_ctx_id))->ret_flags;
     }
 
     return(status);
