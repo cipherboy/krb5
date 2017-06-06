@@ -25,10 +25,10 @@ t_gss_handshake_no_flags(gss_name_t target_name)
     gss_ctx_id_t accept_context = GSS_C_NO_CONTEXT;
 
     maj_stat = gss_create_sec_context(&min_stat, &init_context);
-    check_gsserr("t_gss_handshake_no_flags()", maj_stat, min_stat);
+    check_gsserr("t_gss_handshake_no_flags(1)", maj_stat, min_stat);
 
     maj_stat = gss_create_sec_context(&min_stat, &accept_context);
-    check_gsserr("t_gss_handshake_no_flags()", maj_stat, min_stat);
+    check_gsserr("t_gss_handshake_no_flags(2)", maj_stat, min_stat);
 
     /* Get the initial context token. */
     maj_stat = gss_init_sec_context(&min_stat, GSS_C_NO_CREDENTIAL,
@@ -36,15 +36,16 @@ t_gss_handshake_no_flags(gss_name_t target_name)
                                     GSS_C_NO_CHANNEL_BINDINGS, GSS_C_NO_BUFFER,
                                     NULL, &init_token, NULL, NULL);
 
-    check_gsserr("t_gss_handshake_no_flags()", maj_stat, min_stat);
-    assert(maj_stat == GSS_S_CONTINUE_NEEDED);
+    check_gsserr("t_gss_handshake_no_flags(3)", maj_stat, min_stat);
+    assert(maj_stat == GSS_S_COMPLETE);
 
     /* Process this token into an acceptor context, then discard it. */
     maj_stat = gss_accept_sec_context(&min_stat, &accept_context,
                                       GSS_C_NO_CREDENTIAL, &init_token,
                                       GSS_C_NO_CHANNEL_BINDINGS, NULL,
                                       NULL, &accept_token, NULL, NULL, NULL);
-    check_gsserr("t_gss_handshake_no_flags()", maj_stat, min_stat);
+    check_gsserr("t_gss_handshake_no_flags(4)", maj_stat, min_stat);
+    assert(maj_stat == GSS_S_COMPLETE);
 
     (void)gss_release_buffer(&min_stat, &init_token);
     (void)gss_release_buffer(&min_stat, &accept_token);
