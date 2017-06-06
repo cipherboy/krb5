@@ -24,11 +24,7 @@
  * See src/lib/gssapi/generic/gssapi_ext.h for type definitions.
  */
 OM_uint32 KRB5_CALLCONV
-gss_create_sec_context(minor_status,
-                       context)
-
-OM_uint32    *minor_status;
-gss_ctx_id_t *context;
+gss_create_sec_context(OM_uint32 *minor_status, gss_ctx_id_t *context)
 {
     gss_union_ctx_id_t union_ctx;
     stub_gss_ctx_id_rec *ctx;
