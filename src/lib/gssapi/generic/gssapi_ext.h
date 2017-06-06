@@ -582,8 +582,8 @@ gss_import_cred(
 #define GSS_C_CHANNEL_BOUND_FLAG 2048 /* 0x00000800 */
 
 #define GSSINT_CHK_STUB(p) ((!GSSINT_CHK_LOOP(p)) && \
-    p->mech_type == GSS_C_NO_OID && p->internal_ctx_id != NULL && \
-    ((stub_gss_ctx_id_rec *)p->internal_ctx_id)->magic_num == STUB_MAGIC_ID)
+    p->initial_ctx_id != NULL && \
+    ((stub_gss_ctx_id_rec *)p->initial_ctx_id)->magic_num == STUB_MAGIC_ID)
 
 
 typedef struct _stub_gss_ctx_id_rec {
