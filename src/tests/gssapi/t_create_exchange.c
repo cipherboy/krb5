@@ -14,21 +14,23 @@
 #include "common.h"
 
 static int
-t_gss_handshake_no_flags(gss_name_t target_name)
+t_gss_handshake_create_init(gss_name_t target_name)
 {
     OM_uint32 maj_stat;
     OM_uint32 min_stat;
     gss_OID mech = &mech_krb5;
     gss_buffer_desc init_token;
+    gss_cred_id_t cred = GSS_C_NO_CREDENTIAL;
     gss_buffer_desc accept_token;
     gss_ctx_id_t init_context = GSS_C_NO_CONTEXT;
     gss_ctx_id_t accept_context = GSS_C_NO_CONTEXT;
 
-    maj_stat = gss_create_sec_context(&min_stat, &init_context);
-    check_gsserr("t_gss_handshake_no_flags(1)", maj_stat, min_stat);
+    maj_stat = gss_acquire_cred(&min_stat, GSS_C_NO_NAME, 0, GSS_C_NO_OID_SET,
+                                GSS_C_BOTH, &cred, NULL, NULL);
+    check_gsserr("t_gss_handshake_create_init(0)", maj_stat, min_stat);
 
-    maj_stat = gss_create_sec_context(&min_stat, &accept_context);
-    check_gsserr("t_gss_handshake_no_flags(2)", maj_stat, min_stat);
+    maj_stat = gss_create_sec_context(&min_stat, &init_context);
+    check_gsserr("t_gss_handshake_create_init(1)", maj_stat, min_stat);
 
     /* Get the initial context token. */
     maj_stat = gss_init_sec_context(&min_stat, GSS_C_NO_CREDENTIAL,
@@ -36,15 +38,15 @@ t_gss_handshake_no_flags(gss_name_t target_name)
                                     GSS_C_NO_CHANNEL_BINDINGS, GSS_C_NO_BUFFER,
                                     NULL, &init_token, NULL, NULL);
 
-    check_gsserr("t_gss_handshake_no_flags(3)", maj_stat, min_stat);
+    check_gsserr("t_gss_handshake_create_init(2)", maj_stat, min_stat);
     assert(maj_stat == GSS_S_COMPLETE);
 
     /* Process this token into an acceptor context, then discard it. */
     maj_stat = gss_accept_sec_context(&min_stat, &accept_context,
-                                      GSS_C_NO_CREDENTIAL, &init_token,
+                                      cred, &init_token,
                                       GSS_C_NO_CHANNEL_BINDINGS, NULL,
                                       NULL, &accept_token, NULL, NULL, NULL);
-    check_gsserr("t_gss_handshake_no_flags(4)", maj_stat, min_stat);
+    check_gsserr("t_gss_handshake_create_init(3)", maj_stat, min_stat);
     assert(maj_stat == GSS_S_COMPLETE);
 
     (void)gss_release_buffer(&min_stat, &init_token);
@@ -54,6 +56,100 @@ t_gss_handshake_no_flags(gss_name_t target_name)
     (void)gss_delete_sec_context(&min_stat, &init_context, NULL);
     return 0;
 }
+
+
+static int
+t_gss_handshake_create_accept(gss_name_t target_name)
+{
+    OM_uint32 maj_stat;
+    OM_uint32 min_stat;
+    gss_OID mech = &mech_krb5;
+    gss_buffer_desc init_token;
+    gss_cred_id_t cred = GSS_C_NO_CREDENTIAL;
+    gss_buffer_desc accept_token;
+    gss_ctx_id_t init_context = GSS_C_NO_CONTEXT;
+    gss_ctx_id_t accept_context = GSS_C_NO_CONTEXT;
+
+    maj_stat = gss_acquire_cred(&min_stat, GSS_C_NO_NAME, 0, GSS_C_NO_OID_SET,
+                                GSS_C_BOTH, &cred, NULL, NULL);
+    check_gsserr("t_gss_handshake_create_accept(0)", maj_stat, min_stat);
+
+    maj_stat = gss_create_sec_context(&min_stat, &accept_context);
+    check_gsserr("t_gss_handshake_create_accept(1)", maj_stat, min_stat);
+
+    /* Get the initial context token. */
+    maj_stat = gss_init_sec_context(&min_stat, GSS_C_NO_CREDENTIAL,
+                                    &init_context, target_name, mech, 0, 0,
+                                    GSS_C_NO_CHANNEL_BINDINGS, GSS_C_NO_BUFFER,
+                                    NULL, &init_token, NULL, NULL);
+
+    check_gsserr("t_gss_handshake_create_accept(2)", maj_stat, min_stat);
+    assert(maj_stat == GSS_S_COMPLETE);
+
+    /* Process this token into an acceptor context, then discard it. */
+    maj_stat = gss_accept_sec_context(&min_stat, &accept_context,
+                                      cred, &init_token,
+                                      GSS_C_NO_CHANNEL_BINDINGS, NULL,
+                                      NULL, &accept_token, NULL, NULL, NULL);
+    check_gsserr("t_gss_handshake_create_accept(3)", maj_stat, min_stat);
+    assert(maj_stat == GSS_S_COMPLETE);
+
+    (void)gss_release_buffer(&min_stat, &init_token);
+    (void)gss_release_buffer(&min_stat, &accept_token);
+
+    (void)gss_delete_sec_context(&min_stat, &accept_context, NULL);
+    (void)gss_delete_sec_context(&min_stat, &init_context, NULL);
+    return 0;
+}
+
+
+static int
+t_gss_handshake_create_both(gss_name_t target_name)
+{
+    OM_uint32 maj_stat;
+    OM_uint32 min_stat;
+    gss_OID mech = &mech_krb5;
+    gss_buffer_desc init_token;
+    gss_cred_id_t cred = GSS_C_NO_CREDENTIAL;
+    gss_buffer_desc accept_token;
+    gss_ctx_id_t init_context = GSS_C_NO_CONTEXT;
+    gss_ctx_id_t accept_context = GSS_C_NO_CONTEXT;
+
+    maj_stat = gss_acquire_cred(&min_stat, GSS_C_NO_NAME, 0, GSS_C_NO_OID_SET,
+                                GSS_C_BOTH, &cred, NULL, NULL);
+    check_gsserr("t_gss_handshake_create_both(0)", maj_stat, min_stat);
+
+    maj_stat = gss_create_sec_context(&min_stat, &init_context);
+    check_gsserr("t_gss_handshake_create_both(1)", maj_stat, min_stat);
+
+    maj_stat = gss_create_sec_context(&min_stat, &accept_context);
+    check_gsserr("t_gss_handshake_create_both(2)", maj_stat, min_stat);
+
+    /* Get the initial context token. */
+    maj_stat = gss_init_sec_context(&min_stat, GSS_C_NO_CREDENTIAL,
+                                    &init_context, target_name, mech, 0, 0,
+                                    GSS_C_NO_CHANNEL_BINDINGS, GSS_C_NO_BUFFER,
+                                    NULL, &init_token, NULL, NULL);
+
+    check_gsserr("t_gss_handshake_create_both(3)", maj_stat, min_stat);
+    assert(maj_stat == GSS_S_COMPLETE);
+
+    /* Process this token into an acceptor context, then discard it. */
+    maj_stat = gss_accept_sec_context(&min_stat, &accept_context,
+                                      cred, &init_token,
+                                      GSS_C_NO_CHANNEL_BINDINGS, NULL,
+                                      NULL, &accept_token, NULL, NULL, NULL);
+    check_gsserr("t_gss_handshake_create_both(4)", maj_stat, min_stat);
+    assert(maj_stat == GSS_S_COMPLETE);
+
+    (void)gss_release_buffer(&min_stat, &init_token);
+    (void)gss_release_buffer(&min_stat, &accept_token);
+
+    (void)gss_delete_sec_context(&min_stat, &accept_context, NULL);
+    (void)gss_delete_sec_context(&min_stat, &init_context, NULL);
+    return 0;
+}
+
 
 int
 main(int argc, char *argv[])
@@ -67,8 +163,14 @@ main(int argc, char *argv[])
     }
     target_name = import_name(argv[1]);
 
-    assert(t_gss_handshake_no_flags(target_name) == 0);
-    printf("t_gss_handshake_no_flags... ok\n");
+    assert(t_gss_handshake_create_init(target_name) == 0);
+    printf("t_gss_handshake_create_init... ok\n");
+
+    assert(t_gss_handshake_create_accept(target_name) == 0);
+    printf("t_gss_handshake_create_accept.. ok\n");
+
+    assert(t_gss_handshake_create_both(target_name) == 0);
+    printf("t_gss_handshake_create_both... ok\n");
 
     (void)gss_release_name(&min_stat, &target_name);
 }

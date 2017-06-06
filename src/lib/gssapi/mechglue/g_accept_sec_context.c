@@ -146,6 +146,7 @@ gss_cred_id_t *		d_cred;
     OM_uint32		status, temp_status, temp_minor_status;
     OM_uint32		temp_ret_flags = 0;
     gss_union_ctx_id_t	union_ctx_id = NULL;
+    gss_union_ctx_id_t  potential_union = NULL;
     gss_cred_id_t	input_cred_handle = GSS_C_NO_CREDENTIAL;
     gss_cred_id_t	tmp_d_cred = GSS_C_NO_CREDENTIAL;
     gss_name_t		internal_name = GSS_C_NO_NAME;
@@ -180,8 +181,9 @@ gss_cred_id_t *		d_cred;
      * value of *context_handle to the union context variable.
      */
 
-    if(*context_handle == GSS_C_NO_CONTEXT) {
-
+    potential_union = (gss_union_ctx_id_t)(*context_handle);
+    if(*context_handle == GSS_C_NO_CONTEXT
+       || GSSINT_CHK_STUB(potential_union)) {
 	if (input_token_buffer == GSS_C_NO_BUFFER)
 	    return (GSS_S_CALL_INACCESSIBLE_READ);
 
@@ -220,9 +222,11 @@ gss_cred_id_t *		d_cred;
 
     /* Now create a new context if we didn't get one. */
     if (*context_handle == GSS_C_NO_CONTEXT) {
+
 	status = GSS_S_FAILURE;
 	union_ctx_id = (gss_union_ctx_id_t)
 	    calloc(sizeof(gss_union_ctx_id_desc), 1);
+
 	if (!union_ctx_id)
 	    return (GSS_S_FAILURE);
 
@@ -237,6 +241,14 @@ gss_cred_id_t *		d_cred;
 
 	/* set the new context handle to caller's data */
 	*context_handle = (gss_ctx_id_t)union_ctx_id;
+    } else if (GSSINT_CHK_STUB(potential_union) && potential_union->internal_ctx_id == NULL) {
+        union_ctx_id = potential_union;
+        union_ctx_id->internal_ctx_id = GSS_C_NO_CONTEXT;
+        status = generic_gss_copy_oid(&temp_minor_status, selected_mech, 
+                                      &union_ctx_id->mech_type);
+        if (status != GSS_S_COMPLETE) {
+            return status;
+        }
     }
 
     /*

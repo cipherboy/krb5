@@ -116,6 +116,7 @@ OM_uint32 *		time_rec;
     gss_union_cred_t	union_cred;
     gss_name_t		internal_name;
     gss_union_ctx_id_t	union_ctx_id;
+    gss_union_ctx_id_t  potential_union;
     gss_OID		selected_mech;
     gss_mechanism	mech;
     gss_cred_id_t	input_cred_handle;
@@ -177,6 +178,7 @@ OM_uint32 *		time_rec;
      * value of *context_handle to the union context variable.
      */
 
+    potential_union = (gss_union_ctx_id_t)(*context_handle);
     if(*context_handle == GSS_C_NO_CONTEXT) {
 	status = GSS_S_FAILURE;
 	union_ctx_id = (gss_union_ctx_id_t)
@@ -192,8 +194,16 @@ OM_uint32 *		time_rec;
 
 	/* copy the supplied context handle */
 	union_ctx_id->internal_ctx_id = GSS_C_NO_CONTEXT;
-    } else
+    } else if (GSSINT_CHK_STUB(potential_union)
+               && potential_union->internal_ctx_id == NULL) {
+        union_ctx_id = potential_union;
+        if (generic_gss_copy_oid(&temp_minor_status, selected_mech, 
+                                 &union_ctx_id->mech_type) != GSS_S_COMPLETE) {
+            goto end;
+        }
+    } else {
 	union_ctx_id = (gss_union_ctx_id_t)*context_handle;
+    }
 
     /*
      * get the appropriate cred handle from the union cred struct.
