@@ -222,7 +222,7 @@ gss_cred_id_t *		d_cred;
     if (*context_handle == GSS_C_NO_CONTEXT) {
 	status = GSS_S_FAILURE;
 	union_ctx_id = (gss_union_ctx_id_t)
-	    malloc(sizeof(gss_union_ctx_id_desc));
+	    calloc(sizeof(gss_union_ctx_id_desc), 1);
 	if (!union_ctx_id)
 	    return (GSS_S_FAILURE);
 
