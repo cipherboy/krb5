@@ -406,6 +406,12 @@ error_out:
 	(void) gss_release_buffer(&temp_minor_status,
 				  (gss_buffer_t)tmp_src_name);
 
+
+    if (ret_flags != NULL && GSSINT_CHK_STUB(potential_union)
+        && potential_union->initial_ctx_id != NULL) {
+        *ret_flags &= ((stub_gss_ctx_id_t)(potential_union->initial_ctx_id))->ret_flags;
+    }
+
     return (status);
 }
 #endif /* LEAN_CLIENT */
