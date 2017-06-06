@@ -105,7 +105,9 @@ t_gss_set_context_flags()
     assert(check->magic_num == STUB_MAGIC_ID);
     assert(check->req_flags == 1);
     assert(check->ret_flags == 2);
+
     free(check);
+    free(union_check);
 
     context = NULL;
     maj_stat = gss_set_context_flags(&min_stat, context, 1, 2);
