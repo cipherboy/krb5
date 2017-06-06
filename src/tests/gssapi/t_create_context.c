@@ -36,9 +36,10 @@ t_gss_create_context()
     union_check = (gss_union_ctx_id_t)context;
     assert(union_check != NULL);
     assert(union_check == union_check->loopback);
-    assert(union_check->internal_ctx_id != NULL);
+    assert(union_check->internal_ctx_id == NULL);
+    assert(union_check->initial_ctx_id != NULL);
 
-    check = (stub_gss_ctx_id_rec *)union_check->internal_ctx_id;
+    check = (stub_gss_ctx_id_rec *)union_check->initial_ctx_id;
     assert(check->magic_num == STUB_MAGIC_ID);
     assert(check->req_flags == 0);
     assert(check->ret_flags == 0);
@@ -64,9 +65,10 @@ t_gss_create_context()
     union_check = (gss_union_ctx_id_t)(*context_handle);
     assert(union_check != NULL);
     assert(union_check == union_check->loopback);
-    assert(union_check->internal_ctx_id != NULL);
+    assert(union_check->internal_ctx_id == NULL);
+    assert(union_check->initial_ctx_id != NULL);
 
-    check = (stub_gss_ctx_id_rec *)union_check->internal_ctx_id;
+    check = (stub_gss_ctx_id_rec *)union_check->initial_ctx_id;
     assert(check->magic_num == STUB_MAGIC_ID);
     assert(check->req_flags == 0);
     assert(check->ret_flags == 0);
@@ -99,9 +101,10 @@ t_gss_set_context_flags()
     union_check = (gss_union_ctx_id_t)context;
     assert(union_check != NULL);
     assert(union_check == union_check->loopback);
-    assert(union_check->internal_ctx_id != NULL);
+    assert(union_check->internal_ctx_id == NULL);
+    assert(union_check->initial_ctx_id != NULL);
 
-    check = (stub_gss_ctx_id_rec *)union_check->internal_ctx_id;
+    check = (stub_gss_ctx_id_rec *)union_check->initial_ctx_id;
     assert(check != NULL);
     assert(check->magic_num == STUB_MAGIC_ID);
     assert(check->req_flags == 1);

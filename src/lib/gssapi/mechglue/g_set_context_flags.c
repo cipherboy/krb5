@@ -39,8 +39,7 @@ gss_set_context_flags(OM_uint32 *minor_status, gss_ctx_id_t context,
         return GSS_S_FAILURE;
     }
 
-    ctx = (stub_gss_ctx_id_rec *)union_ctx->internal_ctx_id;
-
+    ctx = (stub_gss_ctx_id_rec *)union_ctx->initial_ctx_id;
     if (ctx == NULL) {
         return GSS_S_FAILURE;
     }

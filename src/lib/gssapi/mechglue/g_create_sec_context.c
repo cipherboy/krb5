@@ -48,7 +48,8 @@ gss_create_sec_context(OM_uint32 *minor_status, gss_ctx_id_t *context)
 
     union_ctx->loopback = union_ctx;
     union_ctx->mech_type = GSS_C_NO_OID;
-    union_ctx->internal_ctx_id = (gss_ctx_id_t)ctx;
+    union_ctx->internal_ctx_id = NULL;
+    union_ctx->initial_ctx_id = (gss_ctx_id_t)ctx;
 
     *context = (gss_ctx_id_t)union_ctx;
 

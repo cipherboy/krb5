@@ -233,9 +233,12 @@ OM_uint32 *		time_rec;
 	map_error(minor_status, mech);
 	if (union_ctx_id->internal_ctx_id == GSS_C_NO_CONTEXT)
 	    *context_handle = GSS_C_NO_CONTEXT;
-	if (*context_handle == GSS_C_NO_CONTEXT) {
-	    free(union_ctx_id->mech_type->elements);
-	    free(union_ctx_id->mech_type);
+
+        if (*context_handle == GSS_C_NO_CONTEXT) {
+            if (union_ctx_id->mech_type != GSS_C_NO_OID) {
+                free(union_ctx_id->mech_type->elements);
+                free(union_ctx_id->mech_type);
+            }
 	    free(union_ctx_id);
 	}
     } else if (*context_handle == GSS_C_NO_CONTEXT) {
