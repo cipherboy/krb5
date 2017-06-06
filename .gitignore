@@ -425,6 +425,7 @@ local.properties
 /src/tests/gssapi/t_accname
 /src/tests/gssapi/t_ccselect
 /src/tests/gssapi/t_create_context
+/src/tests/gssapi/t_create_exchange
 /src/tests/gssapi/t_ciflags
 /src/tests/gssapi/t_credstore
 /src/tests/gssapi/t_enctypes

@@ -1,8 +1,9 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 
 /*
- * This test program verifies that the gss_create_context() can create stub
- * contexts and that gss_set_context_flags() can interpret them.
+ * This test program verifies that the gss_create_sec_context() can create
+ * stub contexts, that gss_set_context_flags() can interpret them, and that
+ * gss_delete_sec_context() can correctly free the structures.
  */
 
 #include <stdio.h>
