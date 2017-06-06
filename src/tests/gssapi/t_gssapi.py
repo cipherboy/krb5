@@ -179,7 +179,6 @@ if krb5_mech not in out or spnego_mech not in out:
 realm.run(['./t_err', 'p:' + realm.host_princ])
 
 # Run gss_create_sec_context interop tests.
-print("p:" + realm.host_princ)
 realm.run(['./t_create_exchange', 'p:' + realm.host_princ])
 
 # Test the GSS_KRB5_CRED_NO_CI_FLAGS_X cred option.
