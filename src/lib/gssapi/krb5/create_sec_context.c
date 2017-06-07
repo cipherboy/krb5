@@ -9,24 +9,21 @@
 OM_uint32 KRB5_CALLCONV
 krb5_gss_create_sec_context(OM_uint32 *minor_status, gss_ctx_id_t *context)
 {
-    /*krb5_error_code kerr;
-
-    krb5_context new_context;
-    if (*context == GSS_C_NO_CONTEXT) {
-        kerr = krb5_gss_init_context(&new_context);
-        if (kerr) {
-            *minor_status = kerr;
-            return GSS_S_FAILURE;
-        }
-        if (GSS_ERROR(kg_sync_ccache_name(new_context, minor_status))) {
-            save_error_info(*minor_status, new_context);
-            krb5_free_context(new_context);
-            return GSS_S_FAILURE;
-        }
-    } else {
-        context = ((krb5_gss_ctx_id_rec *)*context_handle)->k5_context;
+    krb5_gss_ctx_id_rec *ctx;
+    if (context == NULL) {
+        return GSS_S_FAILURE;
     }
 
-    krb5_gss_init_context()*/
-    return 0;
+    ctx = calloc(sizeof(krb5_gss_ctx_id_rec), 1);
+    if (ctx == NULL) {
+        return GSS_S_FAILURE;
+    }
+
+    ctx->magic = KG_CONTEXT;
+
+    *context = (gss_ctx_id_t) ctx;
+
+    assert(KRB5INT_CHK_EMPTY(ctx));
+
+    return GSS_S_COMPLETE;
 }

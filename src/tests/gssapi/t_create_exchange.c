@@ -170,16 +170,14 @@ t_gss_krb5_struct_empty_fireworks(gss_name_t target_name)
     gss_buffer_desc init_token;
     gss_cred_id_t cred = GSS_C_NO_CREDENTIAL;
     gss_buffer_desc accept_token;
-    gss_ctx_id_t init_context = GSS_C_NO_CONTEXT;
     gss_ctx_id_t accept_context = GSS_C_NO_CONTEXT;
 
-        maj_stat = gss_acquire_cred(&min_stat, GSS_C_NO_NAME, 0, GSS_C_NO_OID_SET,
-                                    GSS_C_BOTH, &cred, NULL, NULL);
-        check_gsserr("t_gss_handshake_create_both(0)", maj_stat, min_stat);
-
+    maj_stat = gss_acquire_cred(&min_stat, GSS_C_NO_NAME, 0, GSS_C_NO_OID_SET,
+                                GSS_C_BOTH, &cred, NULL, NULL);
+    check_gsserr("t_gss_krb5_struct_empty_fireworks(0)", maj_stat, min_stat);
 
     maj_stat = gss_create_sec_context(&min_stat, &context);
-    check_gsserr("t_gss_create_context()", maj_stat, min_stat);
+    check_gsserr("t_gss_krb5_struct_empty_fireworks(1)", maj_stat, min_stat);
     assert(context != GSS_C_NO_CONTEXT);
 
     union_ctx = (gss_union_ctx_id_t)context;
@@ -204,15 +202,15 @@ t_gss_krb5_struct_empty_fireworks(gss_name_t target_name)
     union_ctx->internal_ctx_id = (gss_ctx_id_t) ctx;
     ctx->k5_context = krb5_inner_context;
 
-    printf("%p %p\n", krb5_inner_context, ctx->k5_context);
+    printf("Before pointers: %p %p\n", krb5_inner_context, ctx->k5_context);
 
     /* Get the initial context token. */
     maj_stat = gss_init_sec_context(&min_stat, GSS_C_NO_CREDENTIAL,
-                                    &init_context, target_name, mech, 0, 0,
+                                    &context, target_name, mech, 0, 0,
                                     GSS_C_NO_CHANNEL_BINDINGS, GSS_C_NO_BUFFER,
                                     NULL, &init_token, NULL, NULL);
 
-    check_gsserr("t_gss_handshake_create_both(3)", maj_stat, min_stat);
+    check_gsserr("t_gss_krb5_struct_empty_fireworks(2)", maj_stat, min_stat);
     assert(maj_stat == GSS_S_COMPLETE);
     assert(init_token.length != 0);
 
@@ -221,14 +219,14 @@ t_gss_krb5_struct_empty_fireworks(gss_name_t target_name)
                                       cred, &init_token,
                                       GSS_C_NO_CHANNEL_BINDINGS, NULL,
                                       NULL, &accept_token, NULL, NULL, NULL);
-    check_gsserr("t_gss_handshake_create_both(4)", maj_stat, min_stat);
+    check_gsserr("t_gss_krb5_struct_empty_fireworks(3)", maj_stat, min_stat);
     assert(maj_stat == GSS_S_COMPLETE);
 
     (void)gss_release_buffer(&min_stat, &init_token);
     (void)gss_release_buffer(&min_stat, &accept_token);
 
     (void)gss_delete_sec_context(&min_stat, &accept_context, NULL);
-    (void)gss_delete_sec_context(&min_stat, &init_context, NULL);
+    (void)gss_delete_sec_context(&min_stat, &context, NULL);
     return 0;
 }
 
@@ -253,11 +251,6 @@ main(int argc, char *argv[])
 
     assert(t_gss_handshake_create_both(target_name) == 0);
     printf("t_gss_handshake_create_both... ok\n");
-
-    ret_val = t_gss_krb5_struct_empty_fireworks(target_name);
-    printf("%d\n", ret_val);
-    assert(ret_val == 0);
-    printf("t_gss_krb5_struct_empty_fireworks()... ok\n");
 
     (void)gss_release_name(&min_stat, &target_name);
 }
