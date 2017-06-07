@@ -12,9 +12,11 @@
 #include <assert.h>
 
 #include "k5-int.h"
+#include "k5-platform.h"
 #include "common.h"
 #include "mglueP.h"
 #include "gssapiP_krb5.h"
+#include "gssapi_ext.h"
 
 static int
 t_gss_create_context()
@@ -137,6 +139,7 @@ t_gss_create_delete_integration()
 
     return 0;
 }
+
 
 int
 main(int argc, char *argv[])
