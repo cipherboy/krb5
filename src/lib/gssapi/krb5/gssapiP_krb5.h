@@ -157,6 +157,10 @@ enum qop {
     GSS_KRB5_CONF_C_QOP_MASK       = 0xff00
 };
 
+/* Macro to augment checking for partially created KRB5 wrapper structs */
+#define KRB5INT_CHK_EMPTY(p) ((p != NULL) && p->magic == KG_CONTEXT \
+    && p->k5_context == NULL)
+
 /** internal types **/
 
 typedef struct _krb5_gss_name_rec {
