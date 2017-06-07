@@ -111,16 +111,18 @@ OM_uint32 *		ret_flags;
 OM_uint32 *		time_rec;
 
 {
-    OM_uint32		status, temp_minor_status;
-    gss_union_name_t	union_name;
-    gss_union_cred_t	union_cred;
-    gss_name_t		internal_name;
-    gss_union_ctx_id_t	union_ctx_id;
+    OM_uint32           status, temp_minor_status;
+    gss_union_name_t    union_name;
+    gss_union_cred_t    union_cred;
+    gss_name_t          internal_name;
+    gss_union_ctx_id_t  union_ctx_id;
     gss_union_ctx_id_t  potential_union;
-    gss_OID		selected_mech;
-    gss_mechanism	mech;
-    gss_cred_id_t	input_cred_handle;
+    stub_gss_ctx_id_t   stub_ctx = NULL;
+    gss_OID             selected_mech;
+    gss_mechanism       mech;
+    gss_cred_id_t       input_cred_handle;
     OM_uint32           used_req_flags;
+    int                 stub_check;
 
     status = val_init_sec_ctx_args(minor_status,
 				   claimant_cred_handle,
@@ -175,6 +177,7 @@ OM_uint32 *		time_rec;
     /* Set up helper variables for channel binding extension processing */
     potential_union = (gss_union_ctx_id_t)(*context_handle);
     used_req_flags = req_flags;
+    stub_check = GSSINT_CHK_STUB(potential_union);
 
     /*
      * if context_handle is GSS_C_NO_CONTEXT, allocate a union context
@@ -198,16 +201,33 @@ OM_uint32 *		time_rec;
 
 	/* copy the supplied context handle */
 	union_ctx_id->internal_ctx_id = GSS_C_NO_CONTEXT;
-    } else if (GSSINT_CHK_STUB(potential_union)
-               && potential_union->internal_ctx_id == NULL) {
+    } else if (stub_check && (potential_union->internal_ctx_id == NULL)) {
+        status = GSS_S_FAILURE;
         union_ctx_id = potential_union;
+        stub_ctx = (stub_gss_ctx_id_t) union_ctx_id->initial_ctx_id;
+
         if (generic_gss_copy_oid(&temp_minor_status, selected_mech, 
                                  &union_ctx_id->mech_type) != GSS_S_COMPLETE) {
             goto end;
         }
 
+        if (mech->gss_create_sec_context != NULL
+            && mech->gss_create_sec_context(&temp_minor_status,
+                                            &union_ctx_id->internal_ctx_id)
+               != GSS_S_COMPLETE) {
+            goto end;
+        }
+
         if (used_req_flags == 0) {
             used_req_flags = ((stub_gss_ctx_id_t)(potential_union->initial_ctx_id))->req_flags;
+            if (mech->gss_set_context_flags != NULL
+                && mech->gss_set_context_flags(&temp_minor_status,
+                                               union_ctx_id->internal_ctx_id,
+                                               stub_ctx->req_flags,
+                                               stub_ctx->ret_flags)
+                != GSS_S_COMPLETE) {
+                goto end;
+            }
         }
     } else {
 	union_ctx_id = (gss_union_ctx_id_t)*context_handle;
@@ -271,8 +291,7 @@ end:
 					    selected_mech, &internal_name);
     }
 
-    if (ret_flags != NULL && GSSINT_CHK_STUB(potential_union)
-        && potential_union->initial_ctx_id != NULL) {
+    if (ret_flags != NULL && stub_check) {
         *ret_flags &= ((stub_gss_ctx_id_t)(potential_union->initial_ctx_id))->ret_flags;
     }
 
