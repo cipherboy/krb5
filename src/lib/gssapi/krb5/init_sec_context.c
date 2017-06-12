@@ -695,6 +695,7 @@ cleanup:
         if (ctx_free->subkey)
             krb5_k_free_key(context, ctx_free->subkey);
         xfree(ctx_free);
+        *context_handle = NULL;
     }
 
     *minor_status = code;
