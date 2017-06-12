@@ -280,7 +280,9 @@ static struct gss_config spnego_mechanism =
 	NULL,				/* gssspi_import_cred_by_mech */
 	spnego_gss_get_mic_iov,
 	spnego_gss_verify_mic_iov,
-	spnego_gss_get_mic_iov_length
+	spnego_gss_get_mic_iov_length,
+	spnego_gss_create_sec_context,
+	spnego_gss_set_context_flags
 };
 
 #ifdef _GSS_STATIC_LINK
@@ -3042,6 +3044,52 @@ spnego_gss_get_mic_iov_length(OM_uint32 *minor_status,
 
     return gss_get_mic_iov_length(minor_status, sc->ctx_handle, qop_req, iov,
 				  iov_count);
+}
+
+OM_uint32 KRB5_CALLCONV
+spnego_gss_create_sec_context(OM_uint32 *minor_status,
+                              gss_ctx_id_t *context)
+{
+    spnego_gss_ctx_id_rec *ctx;
+    if (context = NULL) {
+        return GSS_S_FAILURE;
+    }
+
+    ctx = calloc(sizeof(spnego_gss_ctx_id_rec), 1);
+    if (ctx == NULL) {
+        return GSS_S_FAILURE;
+    }
+
+    ctx->magic_num = SPNEGO_MAGIC_ID;
+
+    *context = (gss_ctx_id_t)ctx;
+
+    assert(SPNEGOINT_CHK_EMPTY(ctx));
+
+    return GSS_S_COMPLETE;
+}
+
+OM_uint32 KRB5_CALLCONV
+spnego_gss_create_sec_context(OM_uint32 *minor_status,
+                              gss_ctx_id_t *context,
+                              uint64_t req_flags,
+                              uint64_t ret_flags)
+{
+    spnego_gss_ctx_id_t external_context;
+
+    if (context == GSS_S_NO_CONTEXT) {
+        return GSS_S_FAILURE | GSS_S_NO_CONTEXT;
+    }
+
+    external_context = (krb5_gss_ctx_id_t)context;
+    if (external_context->magic != SPNEGO_MAGIC_ID) {
+        return GSS_S_FAILURE | GSS_S_NO_CONTEXT;
+    }
+
+    external_context->req_flags = req_flags;
+    external_context->ret_flags = ret_flags;
+
+    return GSS_S_COMPLETE;
 }
 
 /*
