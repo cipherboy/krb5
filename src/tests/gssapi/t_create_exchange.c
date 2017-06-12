@@ -21,6 +21,7 @@
 static int
 t_gss_handshake_create_init(gss_name_t target_name)
 {
+    /* Check that init_sec_context() accepts an empty sec context */
     OM_uint32 maj_stat;
     OM_uint32 min_stat;
     gss_OID mech = &mech_krb5;
@@ -37,7 +38,6 @@ t_gss_handshake_create_init(gss_name_t target_name)
     maj_stat = gss_create_sec_context(&min_stat, &init_context);
     check_gsserr("t_gss_handshake_create_init(1)", maj_stat, min_stat);
 
-    /* Get the initial context token. */
     maj_stat = gss_init_sec_context(&min_stat, GSS_C_NO_CREDENTIAL,
                                     &init_context, target_name, mech, 0, 0,
                                     GSS_C_NO_CHANNEL_BINDINGS, GSS_C_NO_BUFFER,
@@ -46,7 +46,6 @@ t_gss_handshake_create_init(gss_name_t target_name)
     check_gsserr("t_gss_handshake_create_init(2)", maj_stat, min_stat);
     assert(maj_stat == GSS_S_COMPLETE);
 
-    /* Process this token into an acceptor context, then discard it. */
     maj_stat = gss_accept_sec_context(&min_stat, &accept_context,
                                       cred, &init_token,
                                       GSS_C_NO_CHANNEL_BINDINGS, NULL,
@@ -66,6 +65,7 @@ t_gss_handshake_create_init(gss_name_t target_name)
 static int
 t_gss_handshake_create_accept(gss_name_t target_name)
 {
+    /* Check that accept_sec_context() accepts an empty sec context */
     OM_uint32 maj_stat;
     OM_uint32 min_stat;
     gss_OID mech = &mech_krb5;
@@ -82,7 +82,6 @@ t_gss_handshake_create_accept(gss_name_t target_name)
     maj_stat = gss_create_sec_context(&min_stat, &accept_context);
     check_gsserr("t_gss_handshake_create_accept(1)", maj_stat, min_stat);
 
-    /* Get the initial context token. */
     maj_stat = gss_init_sec_context(&min_stat, GSS_C_NO_CREDENTIAL,
                                     &init_context, target_name, mech, 0, 0,
                                     GSS_C_NO_CHANNEL_BINDINGS, GSS_C_NO_BUFFER,
@@ -91,7 +90,6 @@ t_gss_handshake_create_accept(gss_name_t target_name)
     check_gsserr("t_gss_handshake_create_accept(2)", maj_stat, min_stat);
     assert(maj_stat == GSS_S_COMPLETE);
 
-    /* Process this token into an acceptor context, then discard it. */
     maj_stat = gss_accept_sec_context(&min_stat, &accept_context,
                                       cred, &init_token,
                                       GSS_C_NO_CHANNEL_BINDINGS, NULL,
@@ -111,6 +109,7 @@ t_gss_handshake_create_accept(gss_name_t target_name)
 static int
 t_gss_handshake_create_both(gss_name_t target_name)
 {
+    /* Check that both init/accept_sec_context() accept empty sec contexts */
     OM_uint32 maj_stat;
     OM_uint32 min_stat;
     gss_OID mech = &mech_krb5;
@@ -130,7 +129,6 @@ t_gss_handshake_create_both(gss_name_t target_name)
     maj_stat = gss_create_sec_context(&min_stat, &accept_context);
     check_gsserr("t_gss_handshake_create_both(2)", maj_stat, min_stat);
 
-    /* Get the initial context token. */
     maj_stat = gss_init_sec_context(&min_stat, GSS_C_NO_CREDENTIAL,
                                     &init_context, target_name, mech, 0, 0,
                                     GSS_C_NO_CHANNEL_BINDINGS, GSS_C_NO_BUFFER,
@@ -139,7 +137,6 @@ t_gss_handshake_create_both(gss_name_t target_name)
     check_gsserr("t_gss_handshake_create_both(3)", maj_stat, min_stat);
     assert(maj_stat == GSS_S_COMPLETE);
 
-    /* Process this token into an acceptor context, then discard it. */
     maj_stat = gss_accept_sec_context(&min_stat, &accept_context,
                                       cred, &init_token,
                                       GSS_C_NO_CHANNEL_BINDINGS, NULL,
@@ -148,7 +145,6 @@ t_gss_handshake_create_both(gss_name_t target_name)
     assert(maj_stat == GSS_S_COMPLETE);
 
     (void)gss_release_buffer(&min_stat, &init_token);
-    (void)gss_release_buffer(&min_stat, &accept_token);
 
     (void)gss_delete_sec_context(&min_stat, &accept_context, NULL);
     (void)gss_delete_sec_context(&min_stat, &init_context, NULL);
@@ -157,83 +153,185 @@ t_gss_handshake_create_both(gss_name_t target_name)
 
 
 static int
-t_gss_krb5_struct_empty_fireworks(gss_name_t target_name)
+t_krb5_init_set_req_flags(gss_name_t target_name)
 {
-    OM_uint32 maj_stat = 0;
-    OM_uint32 min_stat = 0;
-    gss_ctx_id_t context = GSS_C_NO_CONTEXT;
-    gss_union_ctx_id_t union_ctx = NULL;
-    krb5_context krb5_inner_context;
-    krb5_error_code kerr;
-    krb5_gss_ctx_id_rec *ctx;
+    /*
+     * Check that req_flags set on the context appear on the context from
+     * init_sec_context.
+     */
+    OM_uint32 maj_stat;
+    OM_uint32 min_stat;
     gss_OID mech = &mech_krb5;
     gss_buffer_desc init_token;
     gss_cred_id_t cred = GSS_C_NO_CREDENTIAL;
-    gss_buffer_desc accept_token;
-    gss_ctx_id_t accept_context = GSS_C_NO_CONTEXT;
+    gss_ctx_id_t init_context = GSS_C_NO_CONTEXT;
+    gss_union_ctx_id_t union_ctx;
+    krb5_gss_ctx_id_t krb5_outer_context;
 
     maj_stat = gss_acquire_cred(&min_stat, GSS_C_NO_NAME, 0, GSS_C_NO_OID_SET,
                                 GSS_C_BOTH, &cred, NULL, NULL);
-    check_gsserr("t_gss_krb5_struct_empty_fireworks(0)", maj_stat, min_stat);
+    check_gsserr("t_gss_handshake_create_both(0)", maj_stat, min_stat);
 
-    maj_stat = gss_create_sec_context(&min_stat, &context);
-    check_gsserr("t_gss_krb5_struct_empty_fireworks(1)", maj_stat, min_stat);
-    assert(context != GSS_C_NO_CONTEXT);
+    maj_stat = gss_create_sec_context(&min_stat, &init_context);
+    check_gsserr("t_gss_handshake_create_both(1)", maj_stat, min_stat);
 
-    union_ctx = (gss_union_ctx_id_t)context;
-    kerr = krb5_gss_init_context(&krb5_inner_context);
-    if (kerr) {
-        return 1;
-    }
+    maj_stat = gss_set_context_flags(&min_stat, init_context,
+                                     GSS_C_SEQUENCE_FLAG, 0);
+    assert(maj_stat == GSS_S_COMPLETE);
 
-    ctx = (krb5_gss_ctx_id_rec *)calloc(sizeof(krb5_gss_ctx_id_rec), 1);
-    if (ctx == NULL) {
-        return 2;
-    }
-
-    ctx->magic = KG_CONTEXT;
-    if (krb5_auth_con_init(krb5_inner_context, &ctx->auth_context))
-        return 3;
-    krb5_auth_con_setflags(krb5_inner_context, ctx->auth_context,
-                           KRB5_AUTH_CONTEXT_DO_SEQUENCE);
-
-
-    ctx->initiate = 1;
-    union_ctx->internal_ctx_id = (gss_ctx_id_t) ctx;
-    ctx->k5_context = krb5_inner_context;
-
-    printf("Before pointers: %p %p\n", krb5_inner_context, ctx->k5_context);
-
-    /* Get the initial context token. */
     maj_stat = gss_init_sec_context(&min_stat, GSS_C_NO_CREDENTIAL,
-                                    &context, target_name, mech, 0, 0,
+                                    &init_context, target_name, mech, 0, 0,
                                     GSS_C_NO_CHANNEL_BINDINGS, GSS_C_NO_BUFFER,
                                     NULL, &init_token, NULL, NULL);
 
-    check_gsserr("t_gss_krb5_struct_empty_fireworks(2)", maj_stat, min_stat);
+    check_gsserr("t_gss_handshake_create_both(2)", maj_stat, min_stat);
     assert(maj_stat == GSS_S_COMPLETE);
-    assert(init_token.length != 0);
 
-    /* Process this token into an acceptor context, then discard it. */
+    union_ctx = (gss_union_ctx_id_t)(init_context);
+    assert(union_ctx != NULL);
+
+    assert(union_ctx->internal_ctx_id != NULL);
+    krb5_outer_context = (krb5_gss_ctx_id_t)(union_ctx->internal_ctx_id);
+
+    assert(krb5_outer_context != NULL);
+
+
+    /*
+     * Assert that our SEQUENCE flag was set correctly.
+     */
+    assert(krb5_outer_context->gss_flags & GSS_C_SEQUENCE_FLAG);
+
+    (void)gss_release_buffer(&min_stat, &init_token);
+    (void)gss_delete_sec_context(&min_stat, &init_context, NULL);
+    return 0;
+}
+
+
+static int
+t_krb5_init_override_set_req_flags(gss_name_t target_name)
+{
+    /*
+     * Check that req_flags set on the context appear on the context from
+     * init_sec_context, but not if they're set on init_sec_context.
+     */
+    OM_uint32 maj_stat;
+    OM_uint32 min_stat;
+    gss_OID mech = &mech_krb5;
+    gss_buffer_desc init_token;
+    gss_cred_id_t cred = GSS_C_NO_CREDENTIAL;
+    gss_ctx_id_t init_context = GSS_C_NO_CONTEXT;
+    gss_union_ctx_id_t union_ctx;
+    krb5_gss_ctx_id_t krb5_outer_context;
+
+    maj_stat = gss_acquire_cred(&min_stat, GSS_C_NO_NAME, 0, GSS_C_NO_OID_SET,
+                                GSS_C_BOTH, &cred, NULL, NULL);
+    check_gsserr("t_gss_handshake_create_both(0)", maj_stat, min_stat);
+
+    maj_stat = gss_create_sec_context(&min_stat, &init_context);
+    check_gsserr("t_gss_handshake_create_both(1)", maj_stat, min_stat);
+
+    maj_stat = gss_set_context_flags(&min_stat, init_context,
+                                     GSS_C_SEQUENCE_FLAG, 0);
+    assert(maj_stat == GSS_S_COMPLETE);
+
+    maj_stat = gss_init_sec_context(&min_stat, GSS_C_NO_CREDENTIAL,
+                                    &init_context, target_name, mech,
+                                    GSS_C_REPLAY_FLAG, 0,
+                                    GSS_C_NO_CHANNEL_BINDINGS, GSS_C_NO_BUFFER,
+                                    NULL, &init_token, NULL, NULL);
+
+    check_gsserr("t_gss_handshake_create_both(2)", maj_stat, min_stat);
+    assert(maj_stat == GSS_S_COMPLETE);
+
+    union_ctx = (gss_union_ctx_id_t)(init_context);
+    assert(union_ctx != NULL);
+
+    assert(union_ctx->internal_ctx_id != NULL);
+    krb5_outer_context = (krb5_gss_ctx_id_t)(union_ctx->internal_ctx_id);
+
+    assert(krb5_outer_context != NULL);
+
+    /*
+     * Assert that our SEQUENCE flag was ignored, and that the replay flag
+     * was set correctly.
+     */
+    assert(krb5_outer_context->gss_flags & GSS_C_REPLAY_FLAG);
+    assert((krb5_outer_context->gss_flags & GSS_C_SEQUENCE_FLAG) == 0);
+
+    (void)gss_release_buffer(&min_stat, &init_token);
+    (void)gss_delete_sec_context(&min_stat, &init_context, NULL);
+    return 0;
+}
+
+
+static int
+t_krb5_accept_set_req_flags(gss_name_t target_name)
+{
+    /*
+     * Check that req_flags set on the context appear on the context from
+     * accept_sec_context.
+     */
+    OM_uint32 maj_stat;
+    OM_uint32 min_stat;
+    gss_OID mech = &mech_krb5;
+    gss_cred_id_t cred = GSS_C_NO_CREDENTIAL;
+    gss_buffer_desc init_token;
+    gss_buffer_desc accept_token;
+    gss_ctx_id_t init_context = GSS_C_NO_CONTEXT;
+    gss_ctx_id_t accept_context = GSS_C_NO_CONTEXT;
+    gss_union_ctx_id_t union_ctx;
+    krb5_gss_ctx_id_t krb5_outer_context;
+
+    maj_stat = gss_acquire_cred(&min_stat, GSS_C_NO_NAME, 0, GSS_C_NO_OID_SET,
+                                GSS_C_BOTH, &cred, NULL, NULL);
+    check_gsserr("t_krb5_accept_set_req_flags(0)", maj_stat, min_stat);
+
+    maj_stat = gss_create_sec_context(&min_stat, &accept_context);
+    check_gsserr("t_krb5_accept_set_req_flags(1)", maj_stat, min_stat);
+
+    maj_stat = gss_set_context_flags(&min_stat, accept_context,
+                                     GSS_C_SEQUENCE_FLAG, 0);
+    check_gsserr("t_krb5_accept_set_req_flags(2)", maj_stat, min_stat);
+
+    maj_stat = gss_init_sec_context(&min_stat, GSS_C_NO_CREDENTIAL,
+                                    &init_context, target_name, mech, 0, 0,
+                                    GSS_C_NO_CHANNEL_BINDINGS, GSS_C_NO_BUFFER,
+                                    NULL, &init_token, NULL, NULL);
+
+    check_gsserr("t_krb5_accept_set_req_flags(3)", maj_stat, min_stat);
+    assert(maj_stat == GSS_S_COMPLETE);
+
     maj_stat = gss_accept_sec_context(&min_stat, &accept_context,
                                       cred, &init_token,
                                       GSS_C_NO_CHANNEL_BINDINGS, NULL,
                                       NULL, &accept_token, NULL, NULL, NULL);
-    check_gsserr("t_gss_krb5_struct_empty_fireworks(3)", maj_stat, min_stat);
+    check_gsserr("t_krb5_accept_set_req_flags(4)", maj_stat, min_stat);
     assert(maj_stat == GSS_S_COMPLETE);
+
+    union_ctx = (gss_union_ctx_id_t)(accept_context);
+    assert(union_ctx != NULL);
+
+    assert(union_ctx->internal_ctx_id != NULL);
+    krb5_outer_context = (krb5_gss_ctx_id_t)(union_ctx->internal_ctx_id);
+
+    assert(krb5_outer_context != NULL);
+
+    /*
+     * Assert that our SEQUENCE flag was set correctly.
+     */
+    assert(krb5_outer_context->gss_flags & GSS_C_SEQUENCE_FLAG);
 
     (void)gss_release_buffer(&min_stat, &init_token);
     (void)gss_release_buffer(&min_stat, &accept_token);
-
+    (void)gss_delete_sec_context(&min_stat, &init_context, NULL);
     (void)gss_delete_sec_context(&min_stat, &accept_context, NULL);
-    (void)gss_delete_sec_context(&min_stat, &context, NULL);
     return 0;
 }
+
 
 int
 main(int argc, char *argv[])
 {
-    int ret_val = 0;
     gss_name_t target_name;
     OM_uint32 min_stat;
 
@@ -251,6 +349,15 @@ main(int argc, char *argv[])
 
     assert(t_gss_handshake_create_both(target_name) == 0);
     printf("t_gss_handshake_create_both... ok\n");
+
+    assert(t_krb5_init_set_req_flags(target_name) == 0);
+    printf("t_krb5_init_set_req_flags... ok\n");
+
+    assert(t_krb5_init_override_set_req_flags(target_name) == 0);
+    printf("t_krb5_init_override_set_req_flags... ok\n");
+
+    assert(t_krb5_accept_set_req_flags(target_name) == 0);
+    printf("t_krb5_accept_set_req_flags... ok\n");
 
     (void)gss_release_name(&min_stat, &target_name);
 }

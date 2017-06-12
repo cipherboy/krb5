@@ -707,7 +707,7 @@ kg_accept_krb5(minor_status, context_handle,
         }
 
         /* Use ap_options from the request to guess the mutual flag. */
-        gss_flags = GSS_C_REPLAY_FLAG | GSS_C_SEQUENCE_FLAG;
+        gss_flags = ctx->gss_flags | GSS_C_REPLAY_FLAG | GSS_C_SEQUENCE_FLAG;
         if (ap_req_options & AP_OPTS_MUTUAL_REQUIRED)
             gss_flags |= GSS_C_MUTUAL_FLAG;
     } else {
@@ -786,6 +786,7 @@ kg_accept_krb5(minor_status, context_handle,
         /* Read the token flags.  Remember if GSS_C_DELEG_FLAG was set, but
          * mask it out until we actually read a delegated credential. */
         TREAD_INT(ptr, gss_flags, 0);
+        gss_flags |= ctx->gss_flags;
         token_deleg_flag = (gss_flags & GSS_C_DELEG_FLAG);
         gss_flags &= ~GSS_C_DELEG_FLAG;
 
@@ -877,8 +878,7 @@ kg_accept_krb5(minor_status, context_handle,
     ctx->auth_context = auth_context;
     ctx->initiate = 0;
 
-    if (gss_flags == 0)
-        gss_flags = ctx->gss_flags;
+    gss_flags |= ctx->gss_flags;
 
     ctx->gss_flags = (GSS_C_TRANS_FLAG |
                       ((gss_flags) & (GSS_C_INTEG_FLAG | GSS_C_CONF_FLAG |
