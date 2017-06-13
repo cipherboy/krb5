@@ -920,7 +920,8 @@ krb5_gss_init_sec_context_ext(
     OM_uint32 tmp_min_stat;
 
     if (*context_handle == GSS_C_NO_CONTEXT) {
-        major_status = krb5_gss_create_sec_context(&tmp_min_stat, context_handle);
+        major_status = krb5_gss_create_sec_context(&tmp_min_stat,
+                                                   context_handle);
 
         if (major_status) {
             return GSS_S_FAILURE;

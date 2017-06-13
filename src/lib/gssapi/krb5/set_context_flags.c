@@ -21,6 +21,10 @@ krb5_gss_set_context_flags(OM_uint32 *minor_status, gss_ctx_id_t context, uint64
         return GSS_S_FAILURE | GSS_S_NO_CONTEXT;
     }
 
+    if (req_flags == 0) {
+        return GSS_S_COMPLETE;
+    }
+
     external_context->gss_flags = req_flags & (GSS_C_CONF_FLAG | GSS_C_INTEG_FLAG |
                                   GSS_C_MUTUAL_FLAG | GSS_C_REPLAY_FLAG |
                                   GSS_C_SEQUENCE_FLAG | GSS_C_DELEG_FLAG |

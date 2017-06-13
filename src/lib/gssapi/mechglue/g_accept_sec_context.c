@@ -186,7 +186,8 @@ gss_cred_id_t *		d_cred;
     potential_union = (gss_union_ctx_id_t)(*context_handle);
     stub_check = GSSINT_CHK_STUB(potential_union);
 
-    if(*context_handle == GSS_C_NO_CONTEXT || stub_check) {
+    if(*context_handle == GSS_C_NO_CONTEXT || (stub_check
+       && potential_union->internal_ctx_id == NULL)) {
 	if (input_token_buffer == GSS_C_NO_BUFFER)
 	    return (GSS_S_CALL_INACCESSIBLE_READ);
 
