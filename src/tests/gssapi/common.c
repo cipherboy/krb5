@@ -130,11 +130,14 @@ establish_contexts(gss_OID imech, gss_cred_id_t icred, gss_cred_id_t acred,
         errout("Unable to set ictx flags");
     }
 
-
-    amaj = GSS_S_COMPLETE;
     amaj = gss_create_sec_context(&minor, actx);
     if (amaj != GSS_S_COMPLETE) {
         errout("Unable to create actx");
+    }
+
+    amaj = gss_set_context_flags(&minor, *actx, flags, flags);
+    if (amaj != GSS_S_COMPLETE) {
+        errout("Unable to set actx flags");
     }
 
     imaj = amaj = GSS_S_CONTINUE_NEEDED;
@@ -143,7 +146,7 @@ establish_contexts(gss_OID imech, gss_cred_id_t icred, gss_cred_id_t acred,
 
     for (;;) {
         (void)gss_release_buffer(&minor, &itok);
-        imaj = gss_init_sec_context(&minor, icred, ictx, tname, imech, flags,
+        imaj = gss_init_sec_context(&minor, icred, ictx, tname, imech, 0,
                                     GSS_C_INDEFINITE,
                                     GSS_C_NO_CHANNEL_BINDINGS, &atok, NULL,
                                     &itok, NULL, NULL);

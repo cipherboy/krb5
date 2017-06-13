@@ -1306,20 +1306,20 @@ krb5_gss_accept_sec_context_ext(
         }
     }
 
-    if (ctx->established == 0 && (ctx->gss_flags & GSS_C_DCE_STYLE)) {
-        return kg_accept_dce(minor_status, context_handle,
-                             verifier_cred_handle, input_token,
-                             input_chan_bindings, src_name, mech_type,
-                             output_token, ret_flags, time_rec,
-                             delegated_cred_handle);
-    }
-
     if (KRB5INT_CHK_EMPTY(ctx)) {
         return kg_accept_krb5(minor_status, context_handle,
                               verifier_cred_handle, input_token,
                               input_chan_bindings, src_name, mech_type,
                               output_token, ret_flags, time_rec,
                               delegated_cred_handle, exts);
+    }
+
+    if (ctx->established == 0 && (ctx->gss_flags & GSS_C_DCE_STYLE)) {
+        return kg_accept_dce(minor_status, context_handle,
+                             verifier_cred_handle, input_token,
+                             input_chan_bindings, src_name, mech_type,
+                             output_token, ret_flags, time_rec,
+                             delegated_cred_handle);
     }
 
     *minor_status = EINVAL;
