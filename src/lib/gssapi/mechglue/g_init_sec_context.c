@@ -291,6 +291,10 @@ end:
 					    selected_mech, &internal_name);
     }
 
+    // Update potential union in case it got freed from under us
+    potential_union = (gss_union_ctx_id_t)(*context_handle);
+    stub_check = GSSINT_CHK_STUB(potential_union);
+
     if (ret_flags != NULL && stub_check) {
         *ret_flags &= ((stub_gss_ctx_id_t)(potential_union->initial_ctx_id))->ret_flags;
     }
