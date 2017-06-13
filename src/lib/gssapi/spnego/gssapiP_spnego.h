@@ -49,6 +49,11 @@ extern "C" {
 #define	ERR_SPNEGO_NEGOTIATION_FAILED		0x20000004
 #define	ERR_SPNEGO_NO_TOKEN_FROM_ACCEPTOR	0x20000005
 
+
+#define SPNEGOINT_CHK_EMPTY(p) ((p != NULL) \
+                                && p->magic_num == SPNEGO_MAGIC_ID \
+                                && p->ctx_handle == NULL)
+
 /*
  * send_token_flag is used to indicate in later steps what type
  * of token, if any should be sent or processed.

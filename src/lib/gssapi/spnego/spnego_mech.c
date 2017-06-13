@@ -451,7 +451,7 @@ create_spnego_ctx(int initiate)
 {
 	spnego_gss_ctx_id_t spnego_ctx = NULL;
 	spnego_ctx = (spnego_gss_ctx_id_t)
-		malloc(sizeof (spnego_gss_ctx_id_rec));
+		calloc(sizeof (spnego_gss_ctx_id_rec), 1);
 
 	if (spnego_ctx == NULL) {
 		return (NULL);
@@ -469,6 +469,8 @@ create_spnego_ctx(int initiate)
 	spnego_ctx->mech_complete = 0;
 	spnego_ctx->nego_done = 0;
 	spnego_ctx->opened = 0;
+        spnego_ctx->req_flags = 0;
+        spnego_ctx->ret_flags = 0;
 	spnego_ctx->initiate = initiate;
 	spnego_ctx->internal_name = GSS_C_NO_NAME;
 	spnego_ctx->actual_mech = GSS_C_NO_OID;
@@ -675,11 +677,11 @@ init_ctx_new(OM_uint32 *minor_status,
 	OM_uint32 ret;
 	spnego_gss_ctx_id_t sc = NULL;
 
-	*sc_out = NULL;
+        assert(sc_out != NULL);
+        sc = *sc_out;
 
-	sc = create_spnego_ctx(1);
-	if (sc == NULL)
-		return GSS_S_FAILURE;
+
+        sc->initiate = 1;
 
 	/* determine negotiation mech set */
 	ret = get_negotiable_mechs(minor_status, spcred, GSS_C_INITIATE,
@@ -702,7 +704,11 @@ init_ctx_new(OM_uint32 *minor_status,
 	ret = GSS_S_CONTINUE_NEEDED;
 
 cleanup:
-	release_spnego_ctx(&sc);
+        if (sc != NULL) {
+    	    release_spnego_ctx(&sc);
+            sc_out = NULL;
+        }
+
 	return ret;
 }
 
@@ -921,6 +927,22 @@ init_ctx_call_init(OM_uint32 *minor_status,
 	if (spcred == NULL || !spcred->no_ask_integ)
 		mech_req_flags |= GSS_C_INTEG_FLAG;
 
+        if (SPNEGOINT_CHK_EMPTY(sc)) {
+            ret = gss_create_sec_context(minor_status, &sc->ctx_handle);
+
+            if (ret != GSS_S_COMPLETE)
+                return ret;
+
+            ret = gss_set_context_flags(minor_status, sc->ctx_handle,
+                                       sc->req_flags, sc->ret_flags);
+
+            if (ret != GSS_S_COMPLETE) {
+                gss_delete_sec_context(minor_status, &sc->ctx_handle,
+                                       GSS_C_NO_BUFFER);
+                return ret; 
+            }
+        }
+
 	ret = gss_init_sec_context(minor_status,
 				   mcred,
 				   &sc->ctx_handle,
@@ -1069,13 +1091,19 @@ spnego_gss_init_sec_context(
 	/* Step 1: perform mechanism negotiation. */
 	spcred = (spnego_gss_cred_id_t)claimant_cred_handle;
 	spnego_ctx = (spnego_gss_ctx_id_t)*context_handle;
-	if (spnego_ctx == NULL) {
+        if (spnego_ctx == NULL) {
+            ret = spnego_gss_create_sec_context(minor_status,
+                                                context_handle);
+
+            if (ret != GSS_S_COMPLETE)
+                goto cleanup;
+
+            spnego_ctx = (spnego_gss_ctx_id_t)(*context_handle);
+        }
+
+	if (SPNEGOINT_CHK_EMPTY(spnego_ctx)) {
 		ret = init_ctx_new(minor_status, spcred, &send_token,
 				   &spnego_ctx);
-		if (ret != GSS_S_CONTINUE_NEEDED) {
-			goto cleanup;
-		}
-		*context_handle = (gss_ctx_id_t)spnego_ctx;
 	} else {
 		ret = init_ctx_cont(minor_status, spnego_ctx,
 				    input_token, &mechtok_in,
@@ -3050,17 +3078,12 @@ OM_uint32 KRB5_CALLCONV
 spnego_gss_create_sec_context(OM_uint32 *minor_status,
                               gss_ctx_id_t *context)
 {
-    spnego_gss_ctx_id_rec *ctx;
-    if (context = NULL) {
+    spnego_gss_ctx_id_t ctx;
+    if (context == NULL) {
         return GSS_S_FAILURE;
     }
 
-    ctx = calloc(sizeof(spnego_gss_ctx_id_rec), 1);
-    if (ctx == NULL) {
-        return GSS_S_FAILURE;
-    }
-
-    ctx->magic_num = SPNEGO_MAGIC_ID;
+    ctx = create_spnego_ctx(0);
 
     *context = (gss_ctx_id_t)ctx;
 
@@ -3070,19 +3093,19 @@ spnego_gss_create_sec_context(OM_uint32 *minor_status,
 }
 
 OM_uint32 KRB5_CALLCONV
-spnego_gss_create_sec_context(OM_uint32 *minor_status,
-                              gss_ctx_id_t *context,
-                              uint64_t req_flags,
-                              uint64_t ret_flags)
+spnego_gss_set_context_flags(OM_uint32 *minor_status,
+                             gss_ctx_id_t context,
+                             uint64_t req_flags,
+                             uint64_t ret_flags)
 {
     spnego_gss_ctx_id_t external_context;
 
-    if (context == GSS_S_NO_CONTEXT) {
+    if (context == GSS_C_NO_CONTEXT) {
         return GSS_S_FAILURE | GSS_S_NO_CONTEXT;
     }
 
-    external_context = (krb5_gss_ctx_id_t)context;
-    if (external_context->magic != SPNEGO_MAGIC_ID) {
+    external_context = (spnego_gss_ctx_id_t)context;
+    if (external_context->magic_num != SPNEGO_MAGIC_ID) {
         return GSS_S_FAILURE | GSS_S_NO_CONTEXT;
     }
 
