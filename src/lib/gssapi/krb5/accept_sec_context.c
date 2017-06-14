@@ -1283,7 +1283,6 @@ krb5_gss_accept_sec_context_ext(
     gss_cred_id_t *delegated_cred_handle,
     krb5_gss_ctx_ext_t exts)
 {
-    OM_uint32 temp_minor_status;
     OM_uint32 major_status;
     krb5_gss_ctx_id_rec *ctx = (krb5_gss_ctx_id_rec *)*context_handle;
 
@@ -1294,16 +1293,11 @@ krb5_gss_accept_sec_context_ext(
      */
 
     if (ctx == NULL) {
-        major_status = krb5_gss_create_sec_context(&temp_minor_status,
+        major_status = krb5_gss_create_sec_context(minor_status,
                                                    context_handle);
         ctx = (krb5_gss_ctx_id_rec *)(*context_handle);
-        if (major_status != GSS_S_COMPLETE) {
-            if (*minor_status != NULL) {
-                *minor_status = temp_minor_status;
-            }
-
+        if (major_status != GSS_S_COMPLETE)
             return major_status;
-        }
     }
 
     if (KRB5INT_CHK_EMPTY(ctx)) {
