@@ -678,11 +678,11 @@ init_ctx_new(OM_uint32 *minor_status,
 	OM_uint32 ret;
 	spnego_gss_ctx_id_t sc = NULL;
 
-        assert(sc_out != NULL);
-        sc = *sc_out;
+	assert(sc_out != NULL);
+	sc = *sc_out;
 
 
-        sc->initiate = 1;
+	sc->initiate = 1;
 
 	/* determine negotiation mech set */
 	ret = get_negotiable_mechs(minor_status, spcred, GSS_C_INITIATE,
@@ -705,10 +705,10 @@ init_ctx_new(OM_uint32 *minor_status,
 	ret = GSS_S_CONTINUE_NEEDED;
 
 cleanup:
-        if (sc != NULL) {
-    	    release_spnego_ctx(&sc);
-            sc_out = NULL;
-        }
+	if (sc != NULL) {
+		release_spnego_ctx(&sc);
+		sc_out = NULL;
+	}
 
 	return ret;
 }
@@ -1316,8 +1316,8 @@ acc_ctx_hints(OM_uint32 *minor_status,
 	gss_OID_set supported_mechSet;
 	spnego_gss_ctx_id_t sc = NULL;
 
-        assert(*sc_out != NULL);
-        sc = *sc_out;
+	assert(*sc_out != NULL);
+	sc = *sc_out;
 
 	*mechListMIC = GSS_C_NO_BUFFER;
 	supported_mechSet = GSS_C_NO_OID_SET;
@@ -1335,7 +1335,7 @@ acc_ctx_hints(OM_uint32 *minor_status,
 		goto cleanup;
 
 	sc->initiate = 0;
-        if (sc == NULL) {
+	if (sc == NULL) {
 		ret = GSS_S_FAILURE;
 		goto cleanup;
 	}

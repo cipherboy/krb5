@@ -117,8 +117,7 @@ establish_contexts(gss_OID imech, gss_cred_id_t icred, gss_cred_id_t acred,
     OM_uint32 minor, imaj, amaj;
     gss_buffer_desc itok, atok;
 
-    *ictx = GSS_C_NO_CONTEXT;
-    *actx = GSS_C_NO_CONTEXT;
+    *ictx = *actx = GSS_C_NO_CONTEXT;
 
     imaj = gss_create_sec_context(&minor, ictx);
     if (imaj != GSS_S_COMPLETE) {
