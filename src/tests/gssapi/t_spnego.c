@@ -291,7 +291,7 @@ main(int argc, char *argv[])
 
     major = gss_create_sec_context(&minor, &acceptor_context);
     check_gsserr("gss_create_sec_context(acceptor)", major, minor);
-    
+
     flags = GSS_C_REPLAY_FLAG | GSS_C_SEQUENCE_FLAG;
 
     major = gss_set_context_flags(&minor, initiator_context, flags, flags);
