@@ -703,7 +703,7 @@ typedef struct gss_config {
 	    int				/* iov_count */
 	);
 
-        /* Extensions in support of channel binding */
+        /* Channel binding signalling extensions */
         /* https://tools.ietf.org/html/draft-ietf-kitten-channel-bound-flag-01 */
 
         OM_uint32       (KRB5_CALLCONV *gss_create_sec_context)

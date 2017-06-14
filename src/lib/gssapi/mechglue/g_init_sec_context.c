@@ -111,18 +111,18 @@ OM_uint32 *		ret_flags;
 OM_uint32 *		time_rec;
 
 {
-    OM_uint32           status, temp_minor_status;
-    gss_union_name_t    union_name;
-    gss_union_cred_t    union_cred;
-    gss_name_t          internal_name;
-    gss_union_ctx_id_t  union_ctx_id;
-    gss_union_ctx_id_t  potential_union;
-    stub_gss_ctx_id_t   stub_ctx = NULL;
-    gss_OID             selected_mech;
-    gss_mechanism       mech;
-    gss_cred_id_t       input_cred_handle;
-    OM_uint32           used_req_flags;
-    int                 stub_check;
+    OM_uint32		status, temp_minor_status;
+    gss_union_name_t	union_name;
+    gss_union_cred_t	union_cred;
+    gss_name_t		internal_name;
+    gss_union_ctx_id_t	union_ctx_id;
+    gss_union_ctx_id_t	potential_union = NULL;
+    stub_gss_ctx_id_t	stub_ctx = NULL;
+    gss_OID		selected_mech;
+    gss_mechanism	mech;
+    gss_cred_id_t	input_cred_handle;
+    OM_uint32		used_req_flags;
+    int			stub_check;
 
     status = val_init_sec_ctx_args(minor_status,
 				   claimant_cred_handle,
@@ -206,7 +206,7 @@ OM_uint32 *		time_rec;
         union_ctx_id = potential_union;
         stub_ctx = (stub_gss_ctx_id_t) union_ctx_id->initial_ctx_id;
 
-        if (generic_gss_copy_oid(&temp_minor_status, selected_mech, 
+        if (generic_gss_copy_oid(&temp_minor_status, selected_mech,
                                  &union_ctx_id->mech_type) != GSS_S_COMPLETE) {
             goto end;
         }
