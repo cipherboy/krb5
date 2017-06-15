@@ -889,7 +889,8 @@ kg_accept_krb5(minor_status, context_handle,
                                       GSS_C_DCE_STYLE | GSS_C_IDENTIFY_FLAG |
                                       GSS_C_EXTENDED_ERROR_FLAG)));
 
-    if (have_cb_success && ctx->gss_flags & GSS_C_MUTUAL_FLAG) {
+    if (have_cb_success && ctx->gss_flags & GSS_C_MUTUAL_FLAG
+        && ctx->ret_flags & GSS_C_CHANNEL_BOUND_FLAG) {
         ctx->gss_flags |= GSS_C_CHANNEL_BOUND_FLAG;
     }
 
