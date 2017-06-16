@@ -580,6 +580,10 @@ gss_import_cred(
 #define STUB_MAGIC_ID 0x00000ca7
 
 #define GSS_C_CHANNEL_BOUND_FLAG 2048 /* 0x00000800 */
+#define GSS_C_CB_CONFIRM_FLAG 2048 /* 0x00000800 */
+
+GSS_DLLIMP extern gss_const_OID GSS_C_MA_CBINDING_CONFIRM;
+GSS_DLLIMP extern gss_const_OID GSS_C_MA_CBINDING_MAY_CONFIRM;
 
 #define GSSINT_CHK_STUB(p) ((!GSSINT_CHK_LOOP(p)) && \
     p->initial_ctx_id != NULL && \
