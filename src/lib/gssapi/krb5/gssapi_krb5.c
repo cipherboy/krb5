@@ -758,6 +758,8 @@ krb5_gss_inquire_attrs_for_mech(OM_uint32 *minor_status,
     MA_SUPPORTED(GSS_C_MA_OOS_DET);
     MA_SUPPORTED(GSS_C_MA_CBINDINGS);
     MA_SUPPORTED(GSS_C_MA_CTX_TRANS);
+    MA_SUPPORTED(GSS_C_MA_CBINDING_CONFIRM);
+    MA_SUPPORTED(GSS_C_MA_CBINDING_MAY_CONFIRM);
 
     if (g_OID_equal(mech, gss_mech_iakerb)) {
         MA_SUPPORTED(GSS_C_MA_AUTH_INIT_INIT);
