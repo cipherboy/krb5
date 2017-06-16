@@ -167,7 +167,7 @@ static const gss_OID_desc const_oids[] = {
 
     /*
      * TODO: actual OIDs for these.
-     * Attributes: 
+     * Attributes:
      *   - GSS_C_MA_CBINDING_CONFIRM
      *   - GSS_C_MA_CBINDING_MAY_CONFIRM
      *
