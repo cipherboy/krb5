@@ -22,9 +22,7 @@ krb5_gss_create_sec_context(OM_uint32 *minor_status, gss_ctx_id_t *context)
 
     ctx->magic = KG_CONTEXT;
 
-    *context = (gss_ctx_id_t) ctx;
-
-    assert(KRB5INT_CHK_EMPTY(ctx));
+    *context = (gss_ctx_id_t)ctx;
 
     return GSS_S_COMPLETE;
 }

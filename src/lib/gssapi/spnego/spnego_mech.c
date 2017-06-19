@@ -689,7 +689,10 @@ init_ctx_new(OM_uint32 *minor_status,
 		if (ret != GSS_S_COMPLETE)
 			return ret;
 
-		ret = gss_add_oid_set_member(minor_status, (gss_OID) GSS_C_MA_CBINDING_MAY_CONFIRM, &desired_attrs);
+		ret = gss_add_oid_set_member(
+		    minor_status,
+		    (gss_OID) GSS_C_MA_CBINDING_MAY_CONFIRM,
+		    &desired_attrs);
 		if (ret != GSS_S_COMPLETE)
 			return ret;
 	}
@@ -3106,18 +3109,16 @@ OM_uint32 KRB5_CALLCONV
 spnego_gss_create_sec_context(OM_uint32 *minor_status,
                               gss_ctx_id_t *context)
 {
-    spnego_gss_ctx_id_t ctx;
-    if (context == NULL) {
-        return GSS_S_FAILURE;
-    }
+	spnego_gss_ctx_id_t ctx;
+	if (context == NULL) {
+		return GSS_S_FAILURE;
+	}
 
-    ctx = create_spnego_ctx(0);
+	ctx = create_spnego_ctx(0);
 
-    *context = (gss_ctx_id_t)ctx;
+	*context = (gss_ctx_id_t)ctx;
 
-    assert(SPNEGOINT_CHK_EMPTY(ctx));
-
-    return GSS_S_COMPLETE;
+	return GSS_S_COMPLETE;
 }
 
 OM_uint32 KRB5_CALLCONV
@@ -3126,21 +3127,21 @@ spnego_gss_set_context_flags(OM_uint32 *minor_status,
                              uint64_t req_flags,
                              uint64_t ret_flags)
 {
-    spnego_gss_ctx_id_t external_context;
+	spnego_gss_ctx_id_t external_context;
 
-    if (context == GSS_C_NO_CONTEXT) {
-        return GSS_S_FAILURE | GSS_S_NO_CONTEXT;
-    }
+	if (context == GSS_C_NO_CONTEXT) {
+		return GSS_S_FAILURE | GSS_S_NO_CONTEXT;
+	}
 
-    external_context = (spnego_gss_ctx_id_t)context;
-    if (external_context->magic_num != SPNEGO_MAGIC_ID) {
-        return GSS_S_FAILURE | GSS_S_NO_CONTEXT;
-    }
+	external_context = (spnego_gss_ctx_id_t)context;
+	if (external_context->magic_num != SPNEGO_MAGIC_ID) {
+		return GSS_S_FAILURE | GSS_S_NO_CONTEXT;
+	}
 
-    external_context->req_flags = req_flags;
-    external_context->ret_flags = ret_flags;
+	external_context->req_flags = req_flags;
+	external_context->ret_flags = ret_flags;
 
-    return GSS_S_COMPLETE;
+	return GSS_S_COMPLETE;
 }
 
 /*
@@ -3176,31 +3177,33 @@ clean_spnego_ctx(spnego_gss_ctx_id_t *ctx)
 	OM_uint32 minor_stat;
 	context = *ctx;
 
-	if (context != NULL) {
-		(void) gss_release_buffer(&minor_stat,
-					&context->DER_mechTypes);
+	if (context == NULL)
+		return;
 
-		(void) gss_release_oid_set(&minor_stat, &context->mech_set);
+	(void)gss_release_buffer(&minor_stat,
+	                         &context->DER_mechTypes);
 
-		(void) gss_release_name(&minor_stat, &context->internal_name);
+	gss_release_oid_set(&minor_stat, &context->mech_set);
+
+	gss_release_name(&minor_stat, &context->internal_name);
 
 
-		context->magic_num = SPNEGO_MAGIC_ID;
-		context->ctx_handle = GSS_C_NO_CONTEXT;
-		context->mech_set = NULL;
-		context->internal_mech = NULL;
-		context->DER_mechTypes.length = 0;
-		context->DER_mechTypes.value = NULL;
-		context->mic_reqd = 0;
-		context->mic_sent = 0;
-		context->mic_rcvd = 0;
-		context->mech_complete = 0;
-		context->nego_done = 0;
-		context->opened = 0;
-		context->internal_name = GSS_C_NO_NAME;
-		context->actual_mech = GSS_C_NO_OID;
-	}
+	context->magic_num = SPNEGO_MAGIC_ID;
+	context->ctx_handle = GSS_C_NO_CONTEXT;
+	context->mech_set = NULL;
+	context->internal_mech = NULL;
+	context->DER_mechTypes.length = 0;
+	context->DER_mechTypes.value = NULL;
+	context->mic_reqd = 0;
+	context->mic_sent = 0;
+	context->mic_rcvd = 0;
+	context->mech_complete = 0;
+	context->nego_done = 0;
+	context->opened = 0;
+	context->internal_name = GSS_C_NO_NAME;
+	context->actual_mech = GSS_C_NO_OID;
 }
+
 
 /*
  * Can't use gss_indicate_mechs by itself to get available mechs for

@@ -522,7 +522,7 @@ kg_new_connection(
     }
 
     if (*context_handle == GSS_C_NO_CONTEXT)
-        return (GSS_S_FAILURE | GSS_S_NO_CONTEXT);
+        return GSS_S_FAILURE | GSS_S_NO_CONTEXT;
 
     /* complain if the input token is non-null */
 
