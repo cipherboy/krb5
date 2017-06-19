@@ -453,7 +453,7 @@ create_spnego_ctx(int initiate)
 {
 	spnego_gss_ctx_id_t spnego_ctx = NULL;
 	spnego_ctx = (spnego_gss_ctx_id_t)
-		calloc(sizeof (spnego_gss_ctx_id_rec), 1);
+		calloc(sizeof(spnego_gss_ctx_id_rec), 1);
 
 	if (spnego_ctx == NULL) {
 		return (NULL);
@@ -686,14 +686,12 @@ init_ctx_new(OM_uint32 *minor_status,
 	if (sc->req_flags & GSS_C_CB_CONFIRM_FLAG) {
 		sc->req_flags |= GSS_C_MUTUAL_FLAG;
 		ret = gss_create_empty_oid_set(minor_status, &desired_attrs);
-		if (ret != GSS_S_COMPLETE) {
+		if (ret != GSS_S_COMPLETE)
 			return ret;
-		}
 
 		ret = gss_add_oid_set_member(minor_status, (gss_OID) GSS_C_MA_CBINDING_MAY_CONFIRM, &desired_attrs);
-		if (ret != GSS_S_COMPLETE) {
+		if (ret != GSS_S_COMPLETE)
 			return ret;
-		}
 	}
 
 	/* determine negotiation mech set */
@@ -943,13 +941,11 @@ init_ctx_call_init(OM_uint32 *minor_status,
 
 	if (SPNEGOINT_CHK_EMPTY(sc)) {
 		ret = gss_create_sec_context(minor_status, &sc->ctx_handle);
-
 		if (ret != GSS_S_COMPLETE)
 			return ret;
 
 		ret = gss_set_context_flags(minor_status, sc->ctx_handle,
 		                            sc->req_flags, sc->ret_flags);
-
 		if (ret != GSS_S_COMPLETE) {
 			gss_delete_sec_context(minor_status, &sc->ctx_handle,
 			                       GSS_C_NO_BUFFER);
@@ -1108,16 +1104,14 @@ spnego_gss_init_sec_context(
 	if (spnego_ctx == NULL) {
 		ret = spnego_gss_create_sec_context(minor_status,
 		                                    context_handle);
-
 		if (ret != GSS_S_COMPLETE)
 			goto cleanup;
 
 		spnego_ctx = (spnego_gss_ctx_id_t)(*context_handle);
 	}
 
-	if (req_flags != 0) {
+	if (req_flags != 0)
 		spnego_ctx->req_flags = req_flags;
-	}
 
 	if (SPNEGOINT_CHK_EMPTY(spnego_ctx)) {
 		ret = init_ctx_new(minor_status, spcred, &send_token,
@@ -1409,7 +1403,9 @@ acc_ctx_new(OM_uint32 *minor_status,
 	*negState = REJECT;
 	*minor_status = 0;
 
-	assert(*sc_out != NULL);
+	if (sc_out == NULL)
+		return GSS_S_FAILURE;
+
 	sc = *sc_out;
 
 	ret = get_negTokenInit(minor_status, buf, &der_mechTypes,
@@ -1451,7 +1447,6 @@ acc_ctx_new(OM_uint32 *minor_status,
 	sc->firstpass = 1;
 	*sc_out = sc;
 	ret = GSS_S_COMPLETE;
-
 cleanup:
 	gss_release_oid_set(&tmpmin, &mechTypes);
 	gss_release_oid_set(&tmpmin, &supported_mechSet);
@@ -1733,9 +1728,8 @@ spnego_gss_accept_sec_context(
 	sc = (spnego_gss_ctx_id_t)*context_handle;
 	if (sc == NULL) {
 		ret = spnego_gss_create_sec_context(minor_status, context_handle);
-		if (ret != GSS_S_COMPLETE) {
+		if (ret != GSS_S_COMPLETE)
 			return ret;
-		}
 
 		sc = (spnego_gss_ctx_id_t)(*context_handle);
 	}
@@ -1750,10 +1744,10 @@ spnego_gss_accept_sec_context(
 		*context_handle = (gss_ctx_id_t)sc;
 		sendTokenInit = 1;
 		ret = GSS_S_CONTINUE_NEEDED;
-	} else if (SPNEGOINT_CHK_EMPTY(sc)
-	           || sc->internal_mech == GSS_C_NO_OID) {
+	} else if (SPNEGOINT_CHK_EMPTY(sc) ||
+	           sc->internal_mech == GSS_C_NO_OID) {
 		if (SPNEGOINT_CHK_EMPTY(sc)) {
-			/* Discard the context from the NegHints request. */
+			/* Discard the contents from the NegHints request. */
 			clean_spnego_ctx(&sc);
 			*context_handle = GSS_C_NO_CONTEXT;
 		}

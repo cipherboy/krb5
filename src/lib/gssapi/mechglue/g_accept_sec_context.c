@@ -159,8 +159,7 @@ gss_cred_id_t *		d_cred;
     gss_OID		public_mech;
     gss_mechanism	mech = NULL;
     gss_union_cred_t	uc;
-    int			i;
-    int			is_stub;
+    int			i, is_stub;
 
     status = val_acc_sec_ctx_args(minor_status,
 				  context_handle,
@@ -186,8 +185,8 @@ gss_cred_id_t *		d_cred;
     potential_union = (gss_union_ctx_id_t)(*context_handle);
     is_stub = GSSINT_CHK_STUB(potential_union);
 
-    if(*context_handle == GSS_C_NO_CONTEXT || (is_stub
-       && potential_union->internal_ctx_id == NULL)) {
+    if (*context_handle == GSS_C_NO_CONTEXT ||
+        (is_stub && potential_union->internal_ctx_id == NULL)) {
 	if (input_token_buffer == GSS_C_NO_BUFFER)
 	    return (GSS_S_CALL_INACCESSIBLE_READ);
 
@@ -234,7 +233,6 @@ gss_cred_id_t *		d_cred;
     /* Now create a new context if we didn't get one. */
     if (*context_handle == GSS_C_NO_CONTEXT) {
 	status = GSS_S_FAILURE;
-
 	union_ctx_id = (gss_union_ctx_id_t)
 	    calloc(sizeof(gss_union_ctx_id_desc), 1);
 	if (!union_ctx_id)
@@ -258,25 +256,26 @@ gss_cred_id_t *		d_cred;
 
         status = generic_gss_copy_oid(&temp_minor_status, selected_mech,
                                       &union_ctx_id->mech_type);
-
         if (status != GSS_S_COMPLETE) {
             return status;
         }
 
-        if (mech->gss_create_sec_context != NULL &&
-            mech->gss_create_sec_context(&temp_minor_status,
-                                         &union_ctx_id->internal_ctx_id)
-            != GSS_S_COMPLETE) {
-            return status;
+        if (mech->gss_create_sec_context != NULL) {
+            status = mech->gss_create_sec_context(
+                &temp_minor_status,
+                &union_ctx_id->internal_ctx_id);
+            if (status != GSS_S_COMPLETE)
+                return status;
         }
 
-        if (mech->gss_set_context_flags != NULL &&
-            mech->gss_set_context_flags(&temp_minor_status,
-                                        union_ctx_id->internal_ctx_id,
-                                        stub_ctx->req_flags,
-                                        stub_ctx->ret_flags)
-            != GSS_S_COMPLETE) {
-            return status;
+        if (mech->gss_set_context_flags != NULL) {
+            status = mech->gss_set_context_flags(
+                &temp_minor_status,
+                union_ctx_id->internal_ctx_id,
+                stub_ctx->req_flags,
+                stub_ctx->ret_flags);
+            if (status != GSS_S_COMPLETE)
+                return status;
         }
     }
 
@@ -429,7 +428,6 @@ error_out:
     if (tmp_src_name != GSS_C_NO_NAME)
 	(void) gss_release_buffer(&temp_minor_status,
 				  (gss_buffer_t)tmp_src_name);
-
 
     if (ret_flags != NULL && GSSINT_CHK_STUB(potential_union)
         && potential_union->initial_ctx_id != NULL) {

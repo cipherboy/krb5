@@ -97,7 +97,7 @@ gss_buffer_t		output_token;
     free(ctx->initial_ctx_id);
 
     /*
-     * if the mech_type is GSS_C_NO_OID, in the case of a stub context,
+     * If the mech_type is GSS_C_NO_OID, in the case of a stub context,
      * we can't dereference mech_type to get mech_type->elements, since
      * mech_type is NULL, and thus doesn't need freeing.
      */

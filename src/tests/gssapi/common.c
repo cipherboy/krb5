@@ -118,34 +118,12 @@ establish_contexts(gss_OID imech, gss_cred_id_t icred, gss_cred_id_t acred,
     gss_buffer_desc itok, atok;
 
     *ictx = *actx = GSS_C_NO_CONTEXT;
-
-    imaj = gss_create_sec_context(&minor, ictx);
-    if (imaj != GSS_S_COMPLETE) {
-        errout("Unable to create ictx");
-    }
-
-    imaj = gss_set_context_flags(&minor, *ictx, flags, flags);
-    if (imaj != GSS_S_COMPLETE) {
-        errout("Unable to set ictx flags");
-    }
-
-    amaj = gss_create_sec_context(&minor, actx);
-    if (amaj != GSS_S_COMPLETE) {
-        errout("Unable to create actx");
-    }
-
-    amaj = gss_set_context_flags(&minor, *actx, flags, flags);
-    if (amaj != GSS_S_COMPLETE) {
-        errout("Unable to set actx flags");
-    }
-
     imaj = amaj = GSS_S_CONTINUE_NEEDED;
     itok.value = atok.value = NULL;
     itok.length = atok.length = 0;
-
     for (;;) {
         (void)gss_release_buffer(&minor, &itok);
-        imaj = gss_init_sec_context(&minor, icred, ictx, tname, imech, 0,
+        imaj = gss_init_sec_context(&minor, icred, ictx, tname, imech, flags,
                                     GSS_C_INDEFINITE,
                                     GSS_C_NO_CHANNEL_BINDINGS, &atok, NULL,
                                     &itok, NULL, NULL);

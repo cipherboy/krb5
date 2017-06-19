@@ -71,8 +71,8 @@ SRCS = \
 	$(srcdir)/rel_oid.c \
 	$(srcdir)/rel_name.c \
 	$(srcdir)/s4u_gss_glue.c \
-	$(srcdir)/ser_sctx.c \
 	$(srcdir)/set_allowable_enctypes.c \
+	$(srcdir)/ser_sctx.c \
 	$(srcdir)/set_ccache.c \
 	$(srcdir)/set_context_flags.c \
 	$(srcdir)/store_cred.c \
@@ -126,8 +126,8 @@ OBJS = \
 	$(OUTPRE)rel_oid.$(OBJEXT) \
 	$(OUTPRE)rel_name.$(OBJEXT) \
 	$(OUTPRE)s4u_gss_glue.$(OBJEXT) \
-	$(OUTPRE)ser_sctx.$(OBJEXT) \
 	$(OUTPRE)set_allowable_enctypes.$(OBJEXT) \
+	$(OUTPRE)ser_sctx.$(OBJEXT) \
 	$(OUTPRE)set_ccache.$(OBJEXT) \
 	$(OUTPRE)set_context_flags.$(OBJEXT) \
 	$(OUTPRE)store_cred.$(OBJEXT) \
@@ -184,8 +184,8 @@ STLIBOBJS = \
 	rel_oid.o \
 	rel_name.o \
 	s4u_gss_glue.o \
-	ser_sctx.o \
 	set_allowable_enctypes.o \
+	ser_sctx.o \
 	set_ccache.o \
 	set_context_flags.o \
 	store_cred.o \

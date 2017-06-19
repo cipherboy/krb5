@@ -473,7 +473,7 @@ kg_accept_krb5(minor_status, context_handle,
 
     ctx = (krb5_gss_ctx_id_t)(*context_handle);
     if (ctx == NULL) {
-        return (GSS_S_FAILURE);
+        return GSS_S_FAILURE;
     }
 
     code = krb5int_accessor (&kaccess, KRB5INT_ACCESS_VERSION);
@@ -707,7 +707,11 @@ kg_accept_krb5(minor_status, context_handle,
             goto fail;
         }
 
-        /* Use ap_options from the request to guess the mutual flag. */
+        /*
+         * Use ap_options from the request to guess the mutual flag.
+         * In the case of a gss_set_context_flags() call, make sure to
+         * include those flags.
+         */
         gss_flags = ctx->gss_flags | GSS_C_REPLAY_FLAG | GSS_C_SEQUENCE_FLAG;
         if (ap_req_options & AP_OPTS_MUTUAL_REQUIRED)
             gss_flags |= GSS_C_MUTUAL_FLAG;
@@ -785,8 +789,11 @@ kg_accept_krb5(minor_status, context_handle,
         xfree(reqcksum.contents);
         reqcksum.contents = 0;
 
-        /* Read the token flags.  Remember if GSS_C_DELEG_FLAG was set, but
-         * mask it out until we actually read a delegated credential. */
+        /*
+         * Read the token flags.  Remember if GSS_C_DELEG_FLAG was set, but
+         * mask it out until we actually read a delegated credential. If
+         * gss_set_context_flags() was called, include those flags.
+         */
         TREAD_INT(ptr, gss_flags, 0);
         gss_flags |= ctx->gss_flags;
         token_deleg_flag = (gss_flags & GSS_C_DELEG_FLAG);
@@ -1299,7 +1306,6 @@ krb5_gss_accept_sec_context_ext(
      * non-established, but currently, accept_sec_context never returns
      * a non-established context handle.
      */
-
     if (ctx == NULL) {
         major_status = krb5_gss_create_sec_context(minor_status,
                                                    context_handle);
@@ -1316,7 +1322,7 @@ krb5_gss_accept_sec_context_ext(
                               delegated_cred_handle, exts);
     }
 
-    if (ctx->established == 0 && (ctx->gss_flags & GSS_C_DCE_STYLE)) {
+    if (ctx->established == 0 && ctx->gss_flags & GSS_C_DCE_STYLE) {
         return kg_accept_dce(minor_status, context_handle,
                              verifier_cred_handle, input_token,
                              input_chan_bindings, src_name, mech_type,
