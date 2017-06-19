@@ -181,6 +181,9 @@ realm.run(['./t_err', 'p:' + realm.host_princ])
 # Run gss_create_sec_context interop tests.
 realm.run(['./t_create_exchange', 'p:' + realm.host_princ])
 
+# Run chanel binding tests.
+realm.run(['./t_channel_bindings', 'p:' + realm.host_princ]);
+
 # Test the GSS_KRB5_CRED_NO_CI_FLAGS_X cred option.
 realm.run(['./t_ciflags', 'p:' + realm.host_princ])
 
