@@ -521,9 +521,8 @@ kg_new_connection(
         return(GSS_S_NO_CRED);
     }
 
-    if (*context_handle == GSS_C_NO_CONTEXT) {
+    if (*context_handle == GSS_C_NO_CONTEXT)
         return (GSS_S_FAILURE | GSS_S_NO_CONTEXT);
-    }
 
     /* complain if the input token is non-null */
 
@@ -886,8 +885,8 @@ mutual_auth(
      * only set CB success flag if it was specified as a ret flag, and
      * if channel bindings were specified by the caller.
      */
-    if (ctx->ret_flags & GSS_C_CHANNEL_BOUND_FLAG
-        && input_chan_bindings != GSS_C_NO_CHANNEL_BINDINGS) {
+    if (ctx->ret_flags & GSS_C_CHANNEL_BOUND_FLAG &&
+        input_chan_bindings != GSS_C_NO_CHANNEL_BINDINGS) {
         ctx->gss_flags |= GSS_C_CHANNEL_BOUND_FLAG;
     }
 
@@ -938,9 +937,8 @@ krb5_gss_init_sec_context_ext(
         major_status = krb5_gss_create_sec_context(&tmp_min_stat,
                                                    context_handle);
 
-        if (major_status) {
+        if (major_status)
             return GSS_S_FAILURE;
-        }
     }
     outer_context = (krb5_gss_ctx_id_t)(*context_handle);
 

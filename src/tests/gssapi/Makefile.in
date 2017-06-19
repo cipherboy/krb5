@@ -38,7 +38,7 @@ all: ccinit ccrefresh t_accname t_ccselect t_ciflags t_create_context \
 	t_namingexts t_oid t_pcontok t_prf t_s4u t_s4u2proxy_krb5 t_saslname \
 	t_spnego t_srcattrs
 
-check-unix: t_invalid t_oid t_prf t_create_context
+check-unix: t_oid t_create_context
 	$(RUN_TEST) ./t_invalid
 	$(RUN_TEST) ./t_oid
 	$(RUN_TEST) ./t_prf

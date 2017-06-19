@@ -35,12 +35,17 @@ gss_create_sec_context(OM_uint32 *minor_status, gss_ctx_id_t *context)
     *minor_status = 0;
 
     union_ctx = calloc(sizeof(gss_union_ctx_id_desc), 1);
-    if (union_ctx == NULL)
+    if (union_ctx == NULL) {
+        if (minor_status != NULL)
+            *minor_status = ENOMEM;
         return GSS_S_UNAVAILABLE;
+    }
 
     ctx = calloc(sizeof(stub_gss_ctx_id_rec), 1);
     if (ctx == NULL) {
         free(union_ctx);
+        if (minor_status != NULL)
+            *minor_status = ENOMEM;
         return GSS_S_UNAVAILABLE;
     }
 

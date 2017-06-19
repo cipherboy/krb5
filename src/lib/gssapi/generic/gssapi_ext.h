@@ -585,7 +585,7 @@ gss_import_cred(
 GSS_DLLIMP extern gss_const_OID GSS_C_MA_CBINDING_CONFIRM;
 GSS_DLLIMP extern gss_const_OID GSS_C_MA_CBINDING_MAY_CONFIRM;
 
-#define GSSINT_CHK_STUB(p) ((!GSSINT_CHK_LOOP(p)) && \
+#define GSSINT_CHK_STUB(p) (!GSSINT_CHK_LOOP(p) && \
     p->initial_ctx_id != NULL && \
     ((stub_gss_ctx_id_rec *)p->initial_ctx_id)->magic_num == STUB_MAGIC_ID)
 

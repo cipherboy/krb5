@@ -158,7 +158,7 @@ enum qop {
 };
 
 /* Macro to augment checking for partially created KRB5 wrapper structs */
-#define KRB5INT_CHK_EMPTY(p) ((p != NULL) && p->magic == KG_CONTEXT \
+#define KRB5INT_CHK_EMPTY(p) (p != NULL && p->magic == KG_CONTEXT \
     && p->k5_context == NULL)
 
 /** internal types **/

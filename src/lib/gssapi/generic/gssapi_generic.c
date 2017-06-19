@@ -242,7 +242,6 @@ GSS_DLLIMP gss_OID GSS_C_SEC_CONTEXT_SASL_SSF = oids+36;
 GSS_DLLIMP gss_const_OID GSS_C_MA_CBINDING_CONFIRM     = oids+37;
 GSS_DLLIMP gss_const_OID GSS_C_MA_CBINDING_MAY_CONFIRM = oids+38;
 
-
 static gss_OID_set_desc gss_ma_known_attrs_desc = { 27, oids+9 };
 gss_OID_set gss_ma_known_attrs = &gss_ma_known_attrs_desc;
 
