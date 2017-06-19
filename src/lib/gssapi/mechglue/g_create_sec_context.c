@@ -1,5 +1,3 @@
-/* #pragma ident	                                                         */
-
 /*
  *  glue routine for gss_create_sec_context
  */
@@ -20,7 +18,7 @@
  * https://tools.ietf.org/html/draft-ietf-kitten-channel-bound-flag-01
  *
  * Section 2.1
- * 
+ *
  * See src/lib/gssapi/generic/gssapi_ext.h for type definitions.
  */
 OM_uint32 KRB5_CALLCONV

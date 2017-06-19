@@ -128,7 +128,7 @@ t_gss_create_delete_integration()
     OM_uint32 maj_stat;
     OM_uint32 min_stat;
     gss_ctx_id_t context = GSS_C_NO_CONTEXT;
-    gss_buffer_desc out_buf; 
+    gss_buffer_desc out_buf;
 
     maj_stat = gss_create_sec_context(&min_stat, &context);
     check_gsserr("t_gss_create_delete_integration()", maj_stat, min_stat);

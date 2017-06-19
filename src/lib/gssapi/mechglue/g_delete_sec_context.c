@@ -102,8 +102,8 @@ gss_buffer_t		output_token;
      * mech_type is NULL, and thus doesn't need freeing.
      */
     if (ctx->mech_type != GSS_C_NO_OID) {
-        free(ctx->mech_type->elements);
-        free(ctx->mech_type);
+	free(ctx->mech_type->elements);
+	free(ctx->mech_type);
     }
 
     free(*context_handle);

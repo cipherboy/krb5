@@ -250,33 +250,33 @@ gss_cred_id_t *		d_cred;
 	/* set the new context handle to caller's data */
 	*context_handle = (gss_ctx_id_t)union_ctx_id;
     } else if (is_stub && potential_union->internal_ctx_id == NULL) {
-        union_ctx_id = potential_union;
-        union_ctx_id->internal_ctx_id = GSS_C_NO_CONTEXT;
-        stub_ctx = (stub_gss_ctx_id_t)union_ctx_id->initial_ctx_id;
+	union_ctx_id = potential_union;
+	union_ctx_id->internal_ctx_id = GSS_C_NO_CONTEXT;
+	stub_ctx = (stub_gss_ctx_id_t)union_ctx_id->initial_ctx_id;
 
-        status = generic_gss_copy_oid(&temp_minor_status, selected_mech,
-                                      &union_ctx_id->mech_type);
-        if (status != GSS_S_COMPLETE) {
-            return status;
-        }
+	status = generic_gss_copy_oid(&temp_minor_status, selected_mech,
+	                              &union_ctx_id->mech_type);
+	if (status != GSS_S_COMPLETE) {
+	    return status;
+	}
 
-        if (mech->gss_create_sec_context != NULL) {
-            status = mech->gss_create_sec_context(
-                &temp_minor_status,
-                &union_ctx_id->internal_ctx_id);
-            if (status != GSS_S_COMPLETE)
-                return status;
-        }
+	if (mech->gss_create_sec_context != NULL) {
+	    status = mech->gss_create_sec_context(
+	        &temp_minor_status,
+	        &union_ctx_id->internal_ctx_id);
+	    if (status != GSS_S_COMPLETE)
+		return status;
+	}
 
-        if (mech->gss_set_context_flags != NULL) {
-            status = mech->gss_set_context_flags(
-                &temp_minor_status,
-                union_ctx_id->internal_ctx_id,
-                stub_ctx->req_flags,
-                stub_ctx->ret_flags);
-            if (status != GSS_S_COMPLETE)
-                return status;
-        }
+	if (mech->gss_set_context_flags != NULL) {
+	    status = mech->gss_set_context_flags(
+	        &temp_minor_status,
+	        union_ctx_id->internal_ctx_id,
+	        stub_ctx->req_flags,
+	        stub_ctx->ret_flags);
+	    if (status != GSS_S_COMPLETE)
+		return status;
+	}
     }
 
     /*
@@ -429,9 +429,11 @@ error_out:
 	(void) gss_release_buffer(&temp_minor_status,
 				  (gss_buffer_t)tmp_src_name);
 
-    if (ret_flags != NULL && GSSINT_CHK_STUB(potential_union)
-        && potential_union->initial_ctx_id != NULL) {
-        *ret_flags &= ((stub_gss_ctx_id_t)(potential_union->initial_ctx_id))->ret_flags;
+    if (ret_flags != NULL && GSSINT_CHK_STUB(potential_union) &&
+	potential_union->initial_ctx_id != NULL) {
+	stub_ctx = (stub_gss_ctx_id_t)(potential_union->initial_ctx_id);
+	if (stub_ctx->ret_flags != 0)
+	    *ret_flags &= stub_ctx->ret_flags;
     }
 
     return (status);
