@@ -146,6 +146,8 @@ gss_cred_id_t *		d_cred;
     OM_uint32		status, temp_status, temp_minor_status;
     OM_uint32		temp_ret_flags = 0;
     gss_union_ctx_id_t	union_ctx_id = NULL;
+    gss_union_ctx_id_t	potential_union = NULL;
+    stub_gss_ctx_id_t	stub_ctx = NULL;
     gss_cred_id_t	input_cred_handle = GSS_C_NO_CREDENTIAL;
     gss_cred_id_t	tmp_d_cred = GSS_C_NO_CREDENTIAL;
     gss_name_t		internal_name = GSS_C_NO_NAME;
@@ -157,7 +159,7 @@ gss_cred_id_t *		d_cred;
     gss_OID		public_mech;
     gss_mechanism	mech = NULL;
     gss_union_cred_t	uc;
-    int			i;
+    int			i, is_stub;
 
     status = val_acc_sec_ctx_args(minor_status,
 				  context_handle,
@@ -180,8 +182,11 @@ gss_cred_id_t *		d_cred;
      * value of *context_handle to the union context variable.
      */
 
-    if(*context_handle == GSS_C_NO_CONTEXT) {
+    potential_union = (gss_union_ctx_id_t)(*context_handle);
+    is_stub = GSSINT_CHK_STUB(potential_union);
 
+    if (*context_handle == GSS_C_NO_CONTEXT ||
+        (is_stub && potential_union->internal_ctx_id == NULL)) {
 	if (input_token_buffer == GSS_C_NO_BUFFER)
 	    return (GSS_S_CALL_INACCESSIBLE_READ);
 
@@ -218,11 +223,18 @@ gss_cred_id_t *		d_cred;
 	selected_mech = union_ctx_id->mech_type;
     }
 
+    /* Make a mech selection so we can use it when creating contexts. */
+    mech = gssint_get_mechanism(selected_mech);
+    if (!mech) {
+        status = GSS_S_BAD_MECH;
+        goto error_out;
+    }
+
     /* Now create a new context if we didn't get one. */
     if (*context_handle == GSS_C_NO_CONTEXT) {
 	status = GSS_S_FAILURE;
 	union_ctx_id = (gss_union_ctx_id_t)
-	    malloc(sizeof(gss_union_ctx_id_desc));
+	    calloc(sizeof(gss_union_ctx_id_desc), 1);
 	if (!union_ctx_id)
 	    return (GSS_S_FAILURE);
 
@@ -237,6 +249,24 @@ gss_cred_id_t *		d_cred;
 
 	/* set the new context handle to caller's data */
 	*context_handle = (gss_ctx_id_t)union_ctx_id;
+    } else if (is_stub && potential_union->internal_ctx_id == NULL) {
+	union_ctx_id = potential_union;
+	union_ctx_id->internal_ctx_id = GSS_C_NO_CONTEXT;
+	stub_ctx = (stub_gss_ctx_id_t)union_ctx_id->initial_ctx_id;
+
+	status = generic_gss_copy_oid(&temp_minor_status, selected_mech,
+	                              &union_ctx_id->mech_type);
+	if (status != GSS_S_COMPLETE) {
+	    return status;
+	}
+
+	if (mech->gss_create_sec_context != NULL) {
+	    status = mech->gss_create_sec_context(
+	        &temp_minor_status,
+	        &union_ctx_id->internal_ctx_id);
+	    if (status != GSS_S_COMPLETE)
+		return status;
+	}
     }
 
     /*
@@ -256,12 +286,7 @@ gss_cred_id_t *		d_cred;
 	goto error_out;
     }
 
-    /*
-     * now select the approprate underlying mechanism routine and
-     * call it.
-     */
-
-    mech = gssint_get_mechanism(selected_mech);
+    /* now call the underlying mechanism routine. */
     if (mech && mech->gss_accept_sec_context) {
 
 	    status = mech->gss_accept_sec_context(minor_status,

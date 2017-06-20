@@ -27,6 +27,7 @@ typedef struct gss_union_ctx_id_struct {
 	struct gss_union_ctx_id_struct *loopback;
 	gss_OID			mech_type;
 	gss_ctx_id_t		internal_ctx_id;
+	gss_ctx_id_t		initial_ctx_id;
 } gss_union_ctx_id_desc, *gss_union_ctx_id_t;
 
 /*
@@ -700,6 +701,15 @@ typedef struct gss_config {
 	    gss_qop_t,			/* qop_req */
 	    gss_iov_buffer_desc *,	/* iov */
 	    int				/* iov_count */
+	);
+
+	/* Channel binding signalling extensions */
+	/* https://tools.ietf.org/html/draft-ietf-kitten-channel-bound-flag-01 */
+
+	OM_uint32       (KRB5_CALLCONV *gss_create_sec_context)
+	(
+	    OM_uint32 *,                /* minor_status */
+	    gss_ctx_id_t *              /* context */
 	);
 
 } *gss_mechanism;

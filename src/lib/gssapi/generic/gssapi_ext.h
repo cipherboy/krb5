@@ -571,6 +571,31 @@ gss_import_cred(
     gss_buffer_t,              /* token */
     gss_cred_id_t *);          /* cred_handle */
 
+
+/*
+ * Channel Binding Extensions
+ * https://tools.ietf.org/html/draft-ietf-kitten-channel-bound-flag-01
+ */
+
+#define STUB_MAGIC_ID 0x00000ca7
+
+#define GSSINT_CHK_STUB(p) (!GSSINT_CHK_LOOP(p) && \
+    p->initial_ctx_id != NULL && \
+    ((stub_gss_ctx_id_rec *)p->initial_ctx_id)->magic_num == STUB_MAGIC_ID)
+
+
+typedef struct _stub_gss_ctx_id_rec {
+    OM_uint32 magic_num;
+    uint64_t req_flags;
+    uint64_t ret_flags;
+} stub_gss_ctx_id_rec, *stub_gss_ctx_id_t;
+
+
+OM_uint32 KRB5_CALLCONV
+gss_create_sec_context(
+    OM_uint32 *,                /* minor_status */
+    gss_ctx_id_t *);            /* context */
+
 #ifdef __cplusplus
 }
 #endif

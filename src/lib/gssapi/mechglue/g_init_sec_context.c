@@ -116,9 +116,12 @@ OM_uint32 *		time_rec;
     gss_union_cred_t	union_cred;
     gss_name_t		internal_name;
     gss_union_ctx_id_t	union_ctx_id;
+    gss_union_ctx_id_t	potential_union = NULL;
+    stub_gss_ctx_id_t	stub_ctx = NULL;
     gss_OID		selected_mech;
     gss_mechanism	mech;
     gss_cred_id_t	input_cred_handle;
+    int			stub_check;
 
     status = val_init_sec_ctx_args(minor_status,
 				   claimant_cred_handle,
@@ -170,6 +173,9 @@ OM_uint32 *		time_rec;
 	    return (status);
     }
 
+    potential_union = (gss_union_ctx_id_t)(*context_handle);
+    stub_check = GSSINT_CHK_STUB(potential_union);
+
     /*
      * if context_handle is GSS_C_NO_CONTEXT, allocate a union context
      * descriptor to hold the mech type information as well as the
@@ -180,7 +186,7 @@ OM_uint32 *		time_rec;
     if(*context_handle == GSS_C_NO_CONTEXT) {
 	status = GSS_S_FAILURE;
 	union_ctx_id = (gss_union_ctx_id_t)
-	    malloc(sizeof(gss_union_ctx_id_desc));
+	    calloc(sizeof(gss_union_ctx_id_desc), 1);
 	if (union_ctx_id == NULL)
 	    goto end;
 
@@ -192,6 +198,24 @@ OM_uint32 *		time_rec;
 
 	/* copy the supplied context handle */
 	union_ctx_id->internal_ctx_id = GSS_C_NO_CONTEXT;
+    } else if (stub_check && potential_union->internal_ctx_id == NULL) {
+	status = GSS_S_FAILURE;
+	union_ctx_id = potential_union;
+	stub_ctx = (stub_gss_ctx_id_t)union_ctx_id->initial_ctx_id;
+
+	if (generic_gss_copy_oid(&temp_minor_status, selected_mech,
+	                         &union_ctx_id->mech_type) != GSS_S_COMPLETE) {
+	    goto end;
+	}
+
+	if (mech->gss_create_sec_context != NULL) {
+	    status = mech->gss_create_sec_context(
+	        &temp_minor_status,
+	        &union_ctx_id->internal_ctx_id);
+	    if (status != GSS_S_COMPLETE)
+		goto end;
+	    stub_ctx = (stub_gss_ctx_id_t)union_ctx_id->initial_ctx_id;
+	}
     } else
 	union_ctx_id = (gss_union_ctx_id_t)*context_handle;
 
@@ -233,9 +257,12 @@ OM_uint32 *		time_rec;
 	map_error(minor_status, mech);
 	if (union_ctx_id->internal_ctx_id == GSS_C_NO_CONTEXT)
 	    *context_handle = GSS_C_NO_CONTEXT;
+
 	if (*context_handle == GSS_C_NO_CONTEXT) {
-	    free(union_ctx_id->mech_type->elements);
-	    free(union_ctx_id->mech_type);
+	    if (union_ctx_id->mech_type != GSS_C_NO_OID) {
+		free(union_ctx_id->mech_type->elements);
+		free(union_ctx_id->mech_type);
+	    }
 	    free(union_ctx_id);
 	}
     } else if (*context_handle == GSS_C_NO_CONTEXT) {
