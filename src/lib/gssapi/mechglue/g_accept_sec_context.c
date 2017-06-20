@@ -267,6 +267,16 @@ gss_cred_id_t *		d_cred;
 	    if (status != GSS_S_COMPLETE)
 		return status;
 	}
+
+	if (mech->gss_set_context_flags != NULL) {
+	    status = mech->gss_set_context_flags(
+	        &temp_minor_status,
+	        union_ctx_id->internal_ctx_id,
+	        stub_ctx->req_flags,
+	        stub_ctx->ret_flags);
+	    if (status != GSS_S_COMPLETE)
+		return status;
+	}
     }
 
     /*
@@ -418,6 +428,13 @@ error_out:
     if (tmp_src_name != GSS_C_NO_NAME)
 	(void) gss_release_buffer(&temp_minor_status,
 				  (gss_buffer_t)tmp_src_name);
+
+    if (ret_flags != NULL && GSSINT_CHK_STUB(potential_union) &&
+	potential_union->initial_ctx_id != NULL) {
+	stub_ctx = (stub_gss_ctx_id_t)(potential_union->initial_ctx_id);
+	if (stub_ctx->ret_flags != 0)
+	    *ret_flags &= stub_ctx->ret_flags;
+    }
 
     return (status);
 }

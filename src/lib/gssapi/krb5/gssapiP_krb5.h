@@ -632,6 +632,13 @@ OM_uint32 KRB5_CALLCONV krb5_gss_create_sec_context
  gss_ctx_id_t*      /* context */
 );
 
+OM_uint32 KRB5_CALLCONV krb5_gss_set_context_flags
+(OM_uint32*,        /* minor_status */
+ gss_ctx_id_t,      /* context */
+ uint64_t,          /* req_flags */
+ uint64_t           /* ret_flags */
+);
+
 OM_uint32 KRB5_CALLCONV krb5_gss_inquire_sec_context_by_oid
 (OM_uint32*,       /* minor_status */
  const gss_ctx_id_t,

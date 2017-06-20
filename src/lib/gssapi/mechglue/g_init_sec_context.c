@@ -121,6 +121,7 @@ OM_uint32 *		time_rec;
     gss_OID		selected_mech;
     gss_mechanism	mech;
     gss_cred_id_t	input_cred_handle;
+    OM_uint32		used_req_flags;
     int			stub_check;
 
     status = val_init_sec_ctx_args(minor_status,
@@ -174,6 +175,7 @@ OM_uint32 *		time_rec;
     }
 
     potential_union = (gss_union_ctx_id_t)(*context_handle);
+    used_req_flags = req_flags;
     stub_check = GSSINT_CHK_STUB(potential_union);
 
     /*
@@ -216,6 +218,19 @@ OM_uint32 *		time_rec;
 		goto end;
 	    stub_ctx = (stub_gss_ctx_id_t)union_ctx_id->initial_ctx_id;
 	}
+
+	if (used_req_flags == 0) {
+	    used_req_flags = stub_ctx->req_flags;
+	    if (mech->gss_set_context_flags != NULL) {
+		status = mech->gss_set_context_flags(
+		    &temp_minor_status,
+		    union_ctx_id->internal_ctx_id,
+		    stub_ctx->req_flags,
+		    stub_ctx->ret_flags);
+		if (status != GSS_S_COMPLETE)
+		    goto end;
+	    }
+	}
     } else
 	union_ctx_id = (gss_union_ctx_id_t)*context_handle;
 
@@ -237,7 +252,7 @@ OM_uint32 *		time_rec;
 	&union_ctx_id->internal_ctx_id,
 	internal_name,
 	gssint_get_public_oid(selected_mech),
-	req_flags,
+	used_req_flags,
 	time_req,
 	input_chan_bindings,
 	input_token,
@@ -275,6 +290,16 @@ end:
 	union_name->mech_name != internal_name) {
 	(void) gssint_release_internal_name(&temp_minor_status,
 					    selected_mech, &internal_name);
+    }
+
+    /* Update potential union in case it got freed from under us */
+    potential_union = (gss_union_ctx_id_t)(*context_handle);
+    stub_check = GSSINT_CHK_STUB(potential_union);
+
+    if (ret_flags != NULL && stub_check) {
+	stub_ctx = (stub_gss_ctx_id_t)union_ctx_id->initial_ctx_id;
+	if (stub_ctx->ret_flags != 0)
+	    *ret_flags &= stub_ctx->ret_flags;
     }
 
     return(status);
