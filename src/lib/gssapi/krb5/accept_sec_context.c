@@ -469,6 +469,7 @@ kg_accept_krb5(minor_status, context_handle,
     krb5_authdata_context ad_context = NULL;
     krb5_principal accprinc = NULL;
     krb5_ap_req *request = NULL;
+    int have_cb_success = 0;
 
     ctx = (krb5_gss_ctx_id_t)(*context_handle);
     if (ctx == NULL) {
@@ -782,6 +783,7 @@ kg_accept_krb5(minor_status, context_handle,
                 goto fail;
             }
 
+            have_cb_success = 1;
         }
 
         xfree(reqcksum.contents);
@@ -893,6 +895,12 @@ kg_accept_krb5(minor_status, context_handle,
                                       GSS_C_SEQUENCE_FLAG | GSS_C_DELEG_FLAG |
                                       GSS_C_DCE_STYLE | GSS_C_IDENTIFY_FLAG |
                                       GSS_C_EXTENDED_ERROR_FLAG)));
+
+    if (have_cb_success && ctx->gss_flags & GSS_C_MUTUAL_FLAG &&
+        ctx->ret_flags & GSS_C_CHANNEL_BOUND_FLAG) {
+        ctx->gss_flags |= GSS_C_CHANNEL_BOUND_FLAG;
+    }
+
     ctx->seed_init = 0;
     ctx->cred_rcache = cred_rcache;
 

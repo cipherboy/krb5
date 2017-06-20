@@ -567,6 +567,9 @@ kg_new_connection(
     if (req_flags & GSS_C_DCE_STYLE)
         ctx->gss_flags |= GSS_C_MUTUAL_FLAG;
 
+    /* refuse to set channel bound flag by default */
+    ctx->gss_flags = ctx->gss_flags & (~GSS_C_CHANNEL_BOUND_FLAG);
+
     if ((code = krb5_timeofday(context, &now)))
         goto cleanup;
 
@@ -873,6 +876,18 @@ mutual_auth(
         if ((code = krb5_timeofday(context, &now)))
             goto fail;
         *time_rec = ts_delta(ctx->krb_times.endtime, now);
+    }
+
+    /* refuse to set channel bound flag by default */
+    ctx->gss_flags = ctx->gss_flags & (~GSS_C_CHANNEL_BOUND_FLAG);
+
+    /*
+     * only set CB success flag if it was specified as a ret flag, and
+     * if channel bindings were specified by the caller.
+     */
+    if (ctx->ret_flags & GSS_C_CHANNEL_BOUND_FLAG &&
+        input_chan_bindings != GSS_C_NO_CHANNEL_BINDINGS) {
+        ctx->gss_flags |= GSS_C_CHANNEL_BOUND_FLAG;
     }
 
     if (ret_flags)
