@@ -97,7 +97,7 @@ gss_ctx_id_t *		context_handle;
     /* Initial value needed below. */
     status = GSS_S_FAILURE;
 
-    ctx = (gss_union_ctx_id_t) malloc(sizeof(gss_union_ctx_id_desc));
+    ctx = (gss_union_ctx_id_t)calloc(sizeof(gss_union_ctx_id_desc), 1);
     if (!ctx)
 	return (GSS_S_FAILURE);
 

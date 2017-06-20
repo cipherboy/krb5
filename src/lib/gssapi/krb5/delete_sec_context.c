@@ -50,6 +50,10 @@ krb5_gss_delete_sec_context(minor_status, context_handle, output_token)
     ctx = (krb5_gss_ctx_id_t) *context_handle;
     context = ctx->k5_context;
 
+    /* Ensure that the context we're trying to free is a krb5 context */
+    if (ctx->magic != KG_CONTEXT)
+        return GSS_S_COMPLETE;
+
     /* free all the context state */
 
     if (ctx->seqstate)

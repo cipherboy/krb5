@@ -157,6 +157,10 @@ enum qop {
     GSS_KRB5_CONF_C_QOP_MASK       = 0xff00
 };
 
+/* Macro to augment checking for partially created KRB5 wrapper structs */
+#define KRB5INT_CHK_EMPTY(p) (p != NULL && p->magic == KG_CONTEXT \
+    && p->k5_context == NULL)
+
 /** internal types **/
 
 typedef struct _krb5_gss_name_rec {
@@ -243,6 +247,8 @@ typedef struct _krb5_gss_ctx_id_rec {
     krb5_cksumtype acceptor_subkey_cksumtype;
     int cred_rcache;             /* did we get rcache from creds? */
     krb5_authdata **authdata;
+    uint64_t req_flags;
+    uint64_t ret_flags;
 } krb5_gss_ctx_id_rec, *krb5_gss_ctx_id_t;
 
 extern g_set kg_vdb;
@@ -620,6 +626,18 @@ OM_uint32 KRB5_CALLCONV krb5_gss_accept_sec_context_ext
  krb5_gss_ctx_ext_t/*exts */
 );
 #endif /* LEAN_CLIENT */
+
+OM_uint32 KRB5_CALLCONV krb5_gss_create_sec_context
+(OM_uint32*,        /* minor_status */
+ gss_ctx_id_t*      /* context */
+);
+
+OM_uint32 KRB5_CALLCONV krb5_gss_set_context_flags
+(OM_uint32*,        /* minor_status */
+ gss_ctx_id_t,      /* context */
+ uint64_t,          /* req_flags */
+ uint64_t           /* ret_flags */
+);
 
 OM_uint32 KRB5_CALLCONV krb5_gss_inquire_sec_context_by_oid
 (OM_uint32*,       /* minor_status */

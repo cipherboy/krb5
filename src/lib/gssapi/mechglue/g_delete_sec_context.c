@@ -94,9 +94,18 @@ gss_buffer_t		output_token;
     if (status)
 	return status;
 
-    /* now free up the space for the union context structure */
-    free(ctx->mech_type->elements);
-    free(ctx->mech_type);
+    free(ctx->initial_ctx_id);
+
+    /*
+     * If the mech_type is GSS_C_NO_OID, in the case of a stub context,
+     * we can't dereference mech_type to get mech_type->elements, since
+     * mech_type is NULL, and thus doesn't need freeing.
+     */
+    if (ctx->mech_type != GSS_C_NO_OID) {
+	free(ctx->mech_type->elements);
+	free(ctx->mech_type);
+    }
+
     free(*context_handle);
     *context_handle = GSS_C_NO_CONTEXT;
 
