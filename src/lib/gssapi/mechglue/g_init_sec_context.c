@@ -119,6 +119,7 @@ OM_uint32 *		time_rec;
     gss_OID		selected_mech;
     gss_mechanism	mech;
     gss_cred_id_t	input_cred_handle;
+    OM_uint32		used_req_flags;
 
     status = val_init_sec_ctx_args(minor_status,
 				   claimant_cred_handle,
@@ -142,6 +143,8 @@ OM_uint32 *		time_rec;
 	return (status);
 
     union_name = (gss_union_name_t)target_name;
+
+    used_req_flags = req_flags;
 
     /*
      * obtain the gss mechanism information for the requested
@@ -204,6 +207,19 @@ OM_uint32 *		time_rec;
 	    if (status != GSS_S_COMPLETE)
 		goto end;
 	}
+
+	if (mech->gss_set_context_flags != NULL) {
+	    status = mech->gss_set_context_flags(
+	        &temp_minor_status,
+	        union_ctx_id->internal_ctx_id,
+	        union_ctx_id->req_flags,
+	        union_ctx_id->ret_flags_understood);
+	    if (status != GSS_S_COMPLETE)
+	        goto end;
+	}
+
+	if (used_req_flags == 0)
+	    used_req_flags = union_ctx_id->req_flags;
     }
 
     /*
@@ -224,7 +240,7 @@ OM_uint32 *		time_rec;
 	&union_ctx_id->internal_ctx_id,
 	internal_name,
 	gssint_get_public_oid(selected_mech),
-	req_flags,
+	used_req_flags,
 	time_req,
 	input_chan_bindings,
 	input_token,
