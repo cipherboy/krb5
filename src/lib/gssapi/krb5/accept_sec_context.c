@@ -494,6 +494,7 @@ kg_accept_krb5(minor_status, context_handle,
     reqcksum.contents = 0;
     ap_req.data = 0;
     ap_rep.data = 0;
+    ctx->gss_flags = 0;
 
     if (mech_type)
         *mech_type = GSS_C_NULL_OID;
@@ -775,6 +776,7 @@ kg_accept_krb5(minor_status, context_handle,
                 goto fail;
             }
 
+            ctx->gss_flags |= GSS_C_CHANNEL_BOUND_FLAG;
         }
 
         xfree(reqcksum.contents);
@@ -873,12 +875,14 @@ kg_accept_krb5(minor_status, context_handle,
     ctx->mech_used = (gss_OID) mech_used;
     ctx->auth_context = auth_context;
     ctx->initiate = 0;
-    ctx->gss_flags = (GSS_C_TRANS_FLAG |
+    ctx->gss_flags |= (GSS_C_TRANS_FLAG |
                       ((gss_flags) & (GSS_C_INTEG_FLAG | GSS_C_CONF_FLAG |
                                       GSS_C_MUTUAL_FLAG | GSS_C_REPLAY_FLAG |
                                       GSS_C_SEQUENCE_FLAG | GSS_C_DELEG_FLAG |
                                       GSS_C_DCE_STYLE | GSS_C_IDENTIFY_FLAG |
-                                      GSS_C_EXTENDED_ERROR_FLAG)));
+                                      GSS_C_EXTENDED_ERROR_FLAG |
+                                      GSS_C_CHANNEL_BOUND_FLAG)));
+
     ctx->seed_init = 0;
     ctx->cred_rcache = cred_rcache;
 
