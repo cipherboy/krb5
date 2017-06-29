@@ -569,6 +569,8 @@ pkinit_fini_plg_crypto(pkinit_plg_crypto_context cryptoctx)
         return;
     pkinit_fini_pkinit_oids(cryptoctx);
     pkinit_fini_dh_params(cryptoctx);
+    EVP_cleanup();
+    ERR_free_strings();
     free(cryptoctx);
 }
 
