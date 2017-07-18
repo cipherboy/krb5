@@ -1,0 +1,911 @@
+From eefc0a09a5a9ad5628e4d3db1cedf86bdce920b8 Mon Sep 17 00:00:00 2001
+From: Alexander Scheel <ascheel@redhat.com>
+Date: Fri, 23 Jun 2017 12:48:50 -0400
+Subject: [PATCH 6/6] Tests for channel binding extension
+
+Updates to gssapi test cases to include new tests for
+compatibility between gss_init/accept_sec_context() with
+these new context calls, and new test cases for channel
+bindings.
+---
+ .gitignore                            |   3 +
+ src/tests/gssapi/Makefile.in          |  21 ++-
+ src/tests/gssapi/t_channel_bindings.c | 305 ++++++++++++++++++++++++++++++++++
+ src/tests/gssapi/t_create_context.c   | 142 ++++++++++++++++
+ src/tests/gssapi/t_create_exchange.c  | 296 +++++++++++++++++++++++++++++++++
+ src/tests/gssapi/t_gssapi.py          |   6 +
+ src/tests/gssapi/t_spnego.c           |  13 ++
+ 7 files changed, 782 insertions(+), 4 deletions(-)
+ create mode 100644 src/tests/gssapi/t_channel_bindings.c
+ create mode 100644 src/tests/gssapi/t_create_context.c
+ create mode 100644 src/tests/gssapi/t_create_exchange.c
+
+diff --git a/.gitignore b/.gitignore
+index f9e8512..7512e5c 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -423,6 +423,9 @@ local.properties
+ /src/tests/gssapi/ccrefresh
+ /src/tests/gssapi/t_accname
+ /src/tests/gssapi/t_ccselect
++/src/tests/gssapi/t_channel_bindings
++/src/tests/gssapi/t_create_context
++/src/tests/gssapi/t_create_exchange
+ /src/tests/gssapi/t_ciflags
+ /src/tests/gssapi/t_credstore
+ /src/tests/gssapi/t_enctypes
+diff --git a/src/tests/gssapi/Makefile.in b/src/tests/gssapi/Makefile.in
+index 6c14642..4f10b1b 100644
+--- a/src/tests/gssapi/Makefile.in
++++ b/src/tests/gssapi/Makefile.in
+@@ -10,7 +10,9 @@ LOCALINCLUDES = -I$(srcdir)/../../lib/gssapi/mechglue \
+ 
+ SRCS=	$(srcdir)/ccinit.c $(srcdir)/ccrefresh.c $(srcdir)/common.c \
+ 	$(srcdir)/t_accname.c $(srcdir)/t_ccselect.c $(srcdir)/t_ciflags.c \
+-	$(srcdir)/t_credstore.c $(srcdir)/t_enctypes.c $(srcdir)/t_err.c \
++	$(srcdir)/t_channel_bindings.c $(srcdir)/t_create_context.c \
++	$(srcdir)/t_create_exchange.c $(srcdir)/t_credstore.c \
++	$(srcdir)/t_enctypes.c $(srcdir)/t_err.c \
+ 	$(srcdir)/t_export_cred.c $(srcdir)/t_export_name.c \
+ 	$(srcdir)/t_gssexts.c $(srcdir)/t_imp_cred.c $(srcdir)/t_imp_name.c \
+ 	$(srcdir)/t_invalid.c $(srcdir)/t_inq_cred.c $(srcdir)/t_inq_ctx.c \
+@@ -20,6 +22,7 @@ SRCS=	$(srcdir)/ccinit.c $(srcdir)/ccrefresh.c $(srcdir)/common.c \
+ 	$(srcdir)/t_saslname.c $(srcdir)/t_spnego.c $(srcdir)/t_srcattrs.c
+ 
+ OBJS=	ccinit.o ccrefresh.o common.o t_accname.o t_ccselect.o t_ciflags.o \
++	t_channel_bindings.o t_create_context.o t_create_exchange.o \
+ 	t_credstore.o t_enctypes.o t_err.o t_export_cred.o t_export_name.o \
+ 	t_gssexts.o t_imp_cred.o t_imp_name.o t_invalid.o t_inq_cred.o \
+ 	t_inq_ctx.o t_inq_mechs_name.o t_iov.o t_namingexts.o t_oid.o \
+@@ -29,18 +32,21 @@ OBJS=	ccinit.o ccrefresh.o common.o t_accname.o t_ccselect.o t_ciflags.o \
+ COMMON_DEPS= common.o $(GSS_DEPLIBS) $(KRB5_BASE_DEPLIBS)
+ COMMON_LIBS= common.o $(GSS_LIBS) $(KRB5_BASE_LIBS)
+ 
+-all: ccinit ccrefresh t_accname t_ccselect t_ciflags t_credstore t_enctypes \
++all: ccinit ccrefresh t_accname t_ccselect t_ciflags t_channel_bindings \
++	t_create_context t_create_exchange t_credstore t_enctypes \
+ 	t_err t_export_cred t_export_name t_gssexts t_imp_cred t_imp_name \
+ 	t_invalid t_inq_cred t_inq_ctx t_inq_mechs_name t_iov t_namingexts \
+ 	t_oid t_pcontok t_prf t_s4u t_s4u2proxy_krb5 t_saslname t_spnego \
+ 	t_srcattrs
+ 
+-check-unix: t_oid
++check-unix: t_oid t_create_context
+ 	$(RUN_TEST) ./t_invalid
+ 	$(RUN_TEST) ./t_oid
+ 	$(RUN_TEST) ./t_prf
++	$(RUN_TEST) ./t_create_context
+ 
+-check-pytests: ccinit ccrefresh t_accname t_ccselect t_ciflags t_credstore \
++check-pytests: ccinit ccrefresh t_accname t_ccselect t_ciflags \
++	t_channel_bindings t_create_exchange t_credstore \
+ 	t_enctypes t_err t_export_cred t_export_name t_imp_cred t_inq_cred \
+ 	t_inq_ctx t_inq_mechs_name t_iov t_pcontok t_s4u t_s4u2proxy_krb5 \
+ 	t_spnego t_srcattrs
+@@ -62,6 +68,12 @@ t_ccselect: t_ccselect.o $(COMMON_DEPS)
+ 	$(CC_LINK) -o $@ t_ccselect.o $(COMMON_LIBS)
+ t_ciflags: t_ciflags.o $(COMMON_DEPS)
+ 	$(CC_LINK) -o $@ t_ciflags.o $(COMMON_LIBS)
++t_channel_bindings: t_channel_bindings.o $(COMMON_DEPS)
++	$(CC_LINK) -o $@ t_channel_bindings.o $(COMMON_LIBS)
++t_create_context: t_create_context.o $(COMMON_DEPS)
++	$(CC_LINK) -o $@ t_create_context.o $(COMMON_LIBS)
++t_create_exchange: t_create_exchange.o $(COMMON_DEPS)
++	$(CC_LINK) -o $@ t_create_exchange.o $(COMMON_LIBS)
+ t_credstore: t_credstore.o $(COMMON_DEPS)
+ 	$(CC_LINK) -o $@ t_credstore.o $(COMMON_LIBS)
+ t_enctypes: t_enctypes.o $(COMMON_DEPS)
+@@ -109,6 +121,7 @@ t_srcattrs: t_srcattrs.o $(COMMON_DEPS)
+ 
+ clean:
+ 	$(RM) ccinit ccrefresh t_accname t_ccselect t_ciflags t_credstore
++	$(RM) t_channel_bindings t_create_context t_create_exchange
+ 	$(RM) t_enctypes t_err t_export_cred t_export_name t_gssexts t_imp_cred
+ 	$(RM) t_imp_name t_invalid t_inq_cred t_inq_ctx t_inq_mechs_name t_iov
+ 	$(RM) t_namingexts t_oid t_pcontok t_prf t_s4u t_s4u2proxy_krb5
+diff --git a/src/tests/gssapi/t_channel_bindings.c b/src/tests/gssapi/t_channel_bindings.c
+new file mode 100644
+index 0000000..37c69b1
+--- /dev/null
++++ b/src/tests/gssapi/t_channel_bindings.c
+@@ -0,0 +1,305 @@
++/* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
++
++/*
++ * This test program verifies that the new chanel binding extensions work as
++ * specified in:
++ *
++ * https://tools.ietf.org/html/draft-ietf-kitten-channel-bound-flag-01
++ */
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <assert.h>
++
++#include "k5-int.h"
++#include "k5-platform.h"
++#include "common.h"
++#include "mglueP.h"
++#include "gssapiP_krb5.h"
++#include "gssapi_ext.h"
++
++
++static int
++t_gss_channel_bindings_check(gss_name_t target_name,
++                             OM_uint32 req_flags,
++                             OM_uint32 init_ret_flags_understood,
++                             OM_uint32 accept_ret_flags_understood,
++                             gss_channel_bindings_t init_cb,
++                             gss_channel_bindings_t accept_cb,
++                             OM_uint32 e_init_status,
++                             OM_uint32 e_accept_status,
++                             OM_uint32 m_init_ret_flags,
++                             OM_uint32 e_init_ret_flags,
++                             OM_uint32 m_accept_ret_flags,
++                             OM_uint32 e_accept_ret_flags)
++{
++    /* Check that both init/accept_sec_context() accept empty sec contexts */
++    OM_uint32 maj_stat;
++    OM_uint32 min_stat;
++    OM_uint32 init_ret_flags = 0;
++    OM_uint32 accept_ret_flags = 0;
++    OM_uint32 init_maj_stat = GSS_S_CONTINUE_NEEDED;
++    OM_uint32 init_min_stat = 0;
++    OM_uint32 accept_maj_stat = GSS_S_CONTINUE_NEEDED;
++    OM_uint32 accept_min_stat = 0;
++    gss_OID mech = &mech_krb5;
++    gss_buffer_desc init_token;
++    gss_buffer_desc accept_token;
++    gss_cred_id_t cred = GSS_C_NO_CREDENTIAL;
++    gss_ctx_id_t init_context = GSS_C_NO_CONTEXT;
++    gss_ctx_id_t accept_context = GSS_C_NO_CONTEXT;
++
++    maj_stat = gss_acquire_cred(&min_stat, GSS_C_NO_NAME, 0, GSS_C_NO_OID_SET,
++                                GSS_C_BOTH, &cred, NULL, NULL);
++    check_gsserr("t_gss_handshake_create_both(0)", maj_stat, min_stat);
++
++    maj_stat = gss_create_sec_context(&min_stat, &init_context);
++    check_gsserr("t_gss_handshake_create_both(1)", maj_stat, min_stat);
++
++    maj_stat = gss_create_sec_context(&min_stat, &accept_context);
++    check_gsserr("t_gss_handshake_create_both(2)", maj_stat, min_stat);
++
++    maj_stat = gss_set_context_flags(&min_stat, init_context, req_flags,
++                                     init_ret_flags_understood);
++    check_gsserr("t_gss_handshake_create_both(3)", maj_stat, min_stat);
++
++    maj_stat = gss_set_context_flags(&min_stat, accept_context, req_flags,
++                                     accept_ret_flags_understood);
++    check_gsserr("t_gss_handshake_create_both(4)", maj_stat, min_stat);
++
++    init_token.length = 0;
++    init_token.value = NULL;
++    accept_token.length = 0;
++    accept_token.value = NULL;
++
++    do {
++        init_maj_stat = gss_init_sec_context(&init_min_stat,
++                                             GSS_C_NO_CREDENTIAL,
++                                             &init_context, target_name, mech,
++                                             0, 0, init_cb, &accept_token,
++                                             NULL, &init_token,
++                                             &init_ret_flags, NULL);
++
++        if (accept_maj_stat != GSS_S_CONTINUE_NEEDED)
++            break;
++
++        accept_maj_stat = gss_accept_sec_context(&accept_min_stat, 
++                                                 &accept_context,
++                                                 cred, &init_token,
++                                                 accept_cb, NULL, NULL,
++                                                 &accept_token,
++                                                 &accept_ret_flags, NULL,
++                                                 NULL);
++
++        if (init_maj_stat != GSS_S_CONTINUE_NEEDED)
++            break;
++    } while (1);
++
++    if (e_init_status == GSS_S_COMPLETE && init_maj_stat != e_init_status)
++        check_gsserr("t_gss_handshake_create_both(5)", init_maj_stat, init_min_stat);
++
++    if (init_maj_stat != e_init_status)
++        return 1;
++
++    if (e_accept_status == GSS_S_COMPLETE && accept_maj_stat != e_accept_status)
++        check_gsserr("t_gss_handshake_create_both(6)", accept_maj_stat, accept_min_stat);
++
++    if (accept_maj_stat != e_accept_status)
++        return 2;
++
++    if ((init_ret_flags & m_init_ret_flags) != e_init_ret_flags)
++        return 3;
++
++    if ((accept_ret_flags & m_accept_ret_flags) != e_accept_ret_flags)
++        return 4;
++
++    (void)gss_release_cred(&min_stat, &cred);
++
++    (void)gss_release_buffer(&min_stat, &init_token);
++    (void)gss_release_buffer(&min_stat, &accept_token);
++
++    (void)gss_delete_sec_context(&min_stat, &accept_context, NULL);
++    (void)gss_delete_sec_context(&min_stat, &init_context, NULL);
++    return 0;
++}
++
++
++int
++main(int argc, char *argv[])
++{
++    gss_name_t target_name;
++    OM_uint32 min_stat;
++    gss_channel_bindings_t cb;
++    gss_channel_bindings_t cb_fail;
++    gss_channel_bindings_t cb_none;
++    OM_uint32 f_mutual;
++    OM_uint32 f_cb;
++    OM_uint32 f_both;
++    int call_val = 0;
++
++    if (argc != 2) {
++        fprintf(stderr, "Usage: %s targetname\n", argv[0]);
++        return 1;
++    }
++    target_name = import_name(argv[1]);
++
++    cb = calloc(sizeof(struct gss_channel_bindings_struct), 1);
++    cb_fail = calloc(sizeof(struct gss_channel_bindings_struct), 1);
++    cb_none = GSS_C_NO_CHANNEL_BINDINGS;
++    assert(cb != NULL);
++    assert(cb_fail != NULL);
++
++    cb->initiator_addrtype = GSS_C_AF_NULLADDR;
++    cb->initiator_address.length = 0;
++    cb->acceptor_addrtype= GSS_C_AF_NULLADDR;
++    cb->acceptor_address.length = 0;
++    cb->application_data.length = 4;
++    cb->application_data.value = "test";
++    
++    cb_fail->initiator_addrtype = GSS_C_AF_NULLADDR;
++    cb_fail->initiator_address.length = 0;
++    cb_fail->acceptor_addrtype= GSS_C_AF_NULLADDR;
++    cb_fail->acceptor_address.length = 0;
++    cb_fail->application_data.length = 4;
++    cb_fail->application_data.value = "fail";
++
++    f_mutual = GSS_C_MUTUAL_FLAG;
++    f_cb = GSS_C_CHANNEL_BOUND_FLAG;
++    f_both = f_mutual | f_cb;
++
++    /* https://tools.ietf.org/html/draft-ietf-kitten-channel-bound-flag-01 */
++    
++    /* Section 3 - first circle */
++    /*
++     * Note that the number of trips is undefined. Thus, force the mutual
++     * flag so that we get a full round trip before the context is established,
++     * forcing init to fail with accept.
++     */
++    call_val = t_gss_channel_bindings_check(
++        target_name,
++        f_both,
++        0,
++        0,
++        cb,
++        cb_fail,
++        GSS_S_FAILURE,
++        GSS_S_BAD_BINDINGS,
++        f_cb,
++        0,
++        f_cb,
++        0);
++    assert(call_val == 0);
++
++    /* Section 3 - second circle */
++    call_val = t_gss_channel_bindings_check(
++        target_name,
++        f_both,
++        0,
++        0,
++        cb_none,
++        cb,
++        GSS_S_FAILURE,
++        GSS_S_BAD_BINDINGS,
++        f_cb,
++        0,
++        f_cb,
++        0);
++    assert(call_val == 0);
++
++    call_val = t_gss_channel_bindings_check(
++        target_name,
++        f_both,
++        0,
++        0,
++        cb,
++        cb,
++        GSS_S_COMPLETE,
++        GSS_S_COMPLETE,
++        f_cb,
++        0,
++        f_cb,
++        f_cb);
++    assert(call_val == 0);
++
++    /* Section 3 - third circle */
++    call_val = t_gss_channel_bindings_check(
++        target_name,
++        f_both,
++        0,
++        0,
++        cb,
++        cb_none,
++        GSS_S_COMPLETE,
++        GSS_S_COMPLETE,
++        f_cb,
++        0,
++        f_cb,
++        0);
++    assert(call_val == 0);
++
++    /* Section 3 - fourth circle */
++    call_val = t_gss_channel_bindings_check(
++        target_name,
++        f_both,
++        f_cb,
++        f_cb,
++        cb,
++        cb_none,
++        GSS_S_COMPLETE,
++        GSS_S_COMPLETE,
++        f_cb,
++        0,
++        f_cb,
++        0);
++    assert(call_val == 0);
++
++    call_val = t_gss_channel_bindings_check(
++        target_name,
++        f_both,
++        f_cb,
++        f_cb,
++        cb_none,
++        cb_none,
++        GSS_S_COMPLETE,
++        GSS_S_COMPLETE,
++        f_cb,
++        0,
++        f_cb,
++        0);
++    assert(call_val == 0);
++
++    call_val = t_gss_channel_bindings_check(
++        target_name,
++        f_both,
++        f_cb,
++        f_cb,
++        cb_none,
++        cb,
++        GSS_S_COMPLETE,
++        GSS_S_COMPLETE,
++        f_cb,
++        0,
++        f_cb,
++        0);
++    assert(call_val == 0);
++
++    call_val = t_gss_channel_bindings_check(
++        target_name,
++        f_both,
++        f_cb,
++        f_cb,
++        cb,
++        cb,
++        GSS_S_COMPLETE,
++        GSS_S_COMPLETE,
++        f_cb,
++        0,
++        f_cb,
++        f_cb);
++    assert(call_val == 0);
++
++    (void)gss_release_name(&min_stat, &target_name);
++
++    return 0;
++}
+diff --git a/src/tests/gssapi/t_create_context.c b/src/tests/gssapi/t_create_context.c
+new file mode 100644
+index 0000000..2b8a705
+--- /dev/null
++++ b/src/tests/gssapi/t_create_context.c
+@@ -0,0 +1,142 @@
++/* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
++
++/*
++ * This test program verifies that the gss_create_sec_context() can create
++ * empty contexts, that gss_set_context_flags() can interpret them, and that
++ * gss_delete_sec_context() can correctly free the structures.
++ */
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <assert.h>
++
++#include "k5-int.h"
++#include "k5-platform.h"
++#include "common.h"
++#include "mglueP.h"
++#include "gssapiP_krb5.h"
++#include "gssapi_ext.h"
++
++static int
++t_gss_create_context()
++{
++    OM_uint32 maj_stat;
++    OM_uint32 min_stat;
++    gss_ctx_id_t context = GSS_C_NO_CONTEXT;
++    gss_union_ctx_id_t union_check;
++    gss_ctx_id_t *context_handle = NULL;
++
++    maj_stat = gss_create_sec_context(&min_stat, NULL);
++    assert(maj_stat != GSS_S_COMPLETE);
++
++    maj_stat = gss_create_sec_context(&min_stat, &context);
++    check_gsserr("t_gss_create_context()", maj_stat, min_stat);
++    assert(context != GSS_C_NO_CONTEXT);
++
++    union_check = (gss_union_ctx_id_t)context;
++    assert(union_check != NULL);
++    assert(union_check == union_check->loopback);
++    assert(union_check->internal_ctx_id == NULL);
++    assert(union_check->req_flags == 0);
++    assert(union_check->ret_flags_understood == 0);
++
++    free(union_check);
++
++    maj_stat = gss_create_sec_context(&min_stat, context_handle);
++    assert(maj_stat != GSS_S_COMPLETE);
++
++    context_handle = malloc(sizeof(gss_ctx_id_t));
++    if (context_handle == NULL) {
++        fprintf(stderr, "MALLOC failed. OOM.\n");
++        return 1;
++    }
++
++    maj_stat = gss_create_sec_context(&min_stat, context_handle);
++    check_gsserr("t_gss_create_context()", maj_stat, min_stat);
++
++    assert(*context_handle != NULL);
++
++    union_check = (gss_union_ctx_id_t)*context_handle;
++    assert(union_check != NULL);
++    assert(union_check == union_check->loopback);
++    assert(union_check->internal_ctx_id == NULL);
++    assert(union_check->req_flags == 0);
++    assert(union_check->ret_flags_understood == 0);
++
++    free(union_check);
++    free(context_handle);
++
++    return 0;
++}
++
++static int
++t_gss_set_context_flags()
++{
++    OM_uint32 maj_stat;
++    OM_uint32 min_stat;
++    gss_ctx_id_t context = GSS_C_NO_CONTEXT;
++    gss_union_ctx_id_t union_check;
++
++    maj_stat = gss_set_context_flags(&min_stat, context, 1, 2);
++    assert(maj_stat != GSS_S_COMPLETE);
++
++    maj_stat = gss_create_sec_context(&min_stat, &context);
++    check_gsserr("t_gss_set_context_flags(1)", maj_stat, min_stat);
++
++    maj_stat = gss_set_context_flags(&min_stat, context, 1, 2);
++    check_gsserr("t_gss_set_context_flags(2)", maj_stat, min_stat);
++
++    union_check = (gss_union_ctx_id_t)context;
++    assert(union_check != NULL);
++    assert(union_check == union_check->loopback);
++    assert(union_check->internal_ctx_id == NULL);
++    assert(union_check->req_flags == 1);
++    assert(union_check->ret_flags_understood == 2);
++
++    maj_stat = gss_delete_sec_context(&min_stat, &context, GSS_C_NO_BUFFER);
++    check_gsserr("t_gss_set_context_flags(3)", maj_stat, min_stat);
++
++    context = NULL;
++    maj_stat = gss_set_context_flags(&min_stat, context, 1, 2);
++    assert(maj_stat != GSS_S_COMPLETE);
++
++    return 0;
++}
++
++static int
++t_gss_create_delete_integration()
++{
++    OM_uint32 maj_stat;
++    OM_uint32 min_stat;
++    gss_ctx_id_t context = GSS_C_NO_CONTEXT;
++    gss_buffer_desc out_buf;
++
++    maj_stat = gss_create_sec_context(&min_stat, &context);
++    check_gsserr("t_gss_create_delete_integration()", maj_stat, min_stat);
++
++    assert(context != GSS_C_NO_CONTEXT);
++
++    maj_stat = gss_delete_sec_context(&min_stat, &context, &out_buf);
++    check_gsserr("t_gss_create_delete_integration()", maj_stat, min_stat);
++
++    assert(out_buf.length == 0);
++
++    return 0;
++}
++
++
++int
++main(int argc, char *argv[])
++{
++    assert(t_gss_create_context() == 0);
++    printf("t_gss_create_context()... ok\n");
++
++    assert(t_gss_set_context_flags() == 0);
++    printf("t_gss_set_context_flags()... ok\n");
++
++    assert(t_gss_create_delete_integration() == 0);
++    printf("t_gss_create_delete_integration()... ok\n");
++
++    return 0;
++}
+diff --git a/src/tests/gssapi/t_create_exchange.c b/src/tests/gssapi/t_create_exchange.c
+new file mode 100644
+index 0000000..90a920b
+--- /dev/null
++++ b/src/tests/gssapi/t_create_exchange.c
+@@ -0,0 +1,296 @@
++/* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
++
++/*
++ * This test program verifies that the gss_create_sec_context(),
++ * gss_set_context_flags(), gss_init_sec_context(), and
++ * gss_accept_sec_context() all interoperate correctly.
++ */
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <assert.h>
++
++#include "k5-int.h"
++#include "k5-platform.h"
++#include "common.h"
++#include "mglueP.h"
++#include "gssapiP_krb5.h"
++#include "gssapi_ext.h"
++
++static int
++t_gss_handshake_create_init(gss_name_t target_name)
++{
++    /* Check that init_sec_context() accepts an empty sec context */
++    OM_uint32 maj_stat;
++    OM_uint32 min_stat;
++    gss_OID mech = &mech_krb5;
++    gss_buffer_desc init_token;
++    gss_cred_id_t cred = GSS_C_NO_CREDENTIAL;
++    gss_buffer_desc accept_token;
++    gss_ctx_id_t init_context = GSS_C_NO_CONTEXT;
++    gss_ctx_id_t accept_context = GSS_C_NO_CONTEXT;
++
++    maj_stat = gss_acquire_cred(&min_stat, GSS_C_NO_NAME, 0, GSS_C_NO_OID_SET,
++                                GSS_C_BOTH, &cred, NULL, NULL);
++    check_gsserr("t_gss_handshake_create_init(0)", maj_stat, min_stat);
++
++    maj_stat = gss_create_sec_context(&min_stat, &init_context);
++    check_gsserr("t_gss_handshake_create_init(1)", maj_stat, min_stat);
++
++    maj_stat = gss_init_sec_context(&min_stat, GSS_C_NO_CREDENTIAL,
++                                    &init_context, target_name, mech, 0, 0,
++                                    GSS_C_NO_CHANNEL_BINDINGS, GSS_C_NO_BUFFER,
++                                    NULL, &init_token, NULL, NULL);
++
++    check_gsserr("t_gss_handshake_create_init(2)", maj_stat, min_stat);
++    assert(maj_stat == GSS_S_COMPLETE);
++
++    maj_stat = gss_accept_sec_context(&min_stat, &accept_context,
++                                      cred, &init_token,
++                                      GSS_C_NO_CHANNEL_BINDINGS, NULL,
++                                      NULL, &accept_token, NULL, NULL, NULL);
++    check_gsserr("t_gss_handshake_create_init(3)", maj_stat, min_stat);
++    assert(maj_stat == GSS_S_COMPLETE);
++
++    (void)gss_release_buffer(&min_stat, &init_token);
++    (void)gss_release_buffer(&min_stat, &accept_token);
++
++    (void)gss_delete_sec_context(&min_stat, &accept_context, NULL);
++    (void)gss_delete_sec_context(&min_stat, &init_context, NULL);
++    return 0;
++}
++
++
++static int
++t_gss_handshake_create_accept(gss_name_t target_name)
++{
++    /* Check that accept_sec_context() accepts an empty sec context */
++    OM_uint32 maj_stat;
++    OM_uint32 min_stat;
++    gss_OID mech = &mech_krb5;
++    gss_buffer_desc init_token;
++    gss_cred_id_t cred = GSS_C_NO_CREDENTIAL;
++    gss_buffer_desc accept_token;
++    gss_ctx_id_t init_context = GSS_C_NO_CONTEXT;
++    gss_ctx_id_t accept_context = GSS_C_NO_CONTEXT;
++
++    maj_stat = gss_acquire_cred(&min_stat, GSS_C_NO_NAME, 0, GSS_C_NO_OID_SET,
++                                GSS_C_BOTH, &cred, NULL, NULL);
++    check_gsserr("t_gss_handshake_create_accept(0)", maj_stat, min_stat);
++
++    maj_stat = gss_create_sec_context(&min_stat, &accept_context);
++    check_gsserr("t_gss_handshake_create_accept(1)", maj_stat, min_stat);
++
++    maj_stat = gss_init_sec_context(&min_stat, GSS_C_NO_CREDENTIAL,
++                                    &init_context, target_name, mech, 0, 0,
++                                    GSS_C_NO_CHANNEL_BINDINGS, GSS_C_NO_BUFFER,
++                                    NULL, &init_token, NULL, NULL);
++
++    check_gsserr("t_gss_handshake_create_accept(2)", maj_stat, min_stat);
++    assert(maj_stat == GSS_S_COMPLETE);
++
++    maj_stat = gss_accept_sec_context(&min_stat, &accept_context,
++                                      cred, &init_token,
++                                      GSS_C_NO_CHANNEL_BINDINGS, NULL,
++                                      NULL, &accept_token, NULL, NULL, NULL);
++    check_gsserr("t_gss_handshake_create_accept(3)", maj_stat, min_stat);
++    assert(maj_stat == GSS_S_COMPLETE);
++
++    (void)gss_release_buffer(&min_stat, &init_token);
++    (void)gss_release_buffer(&min_stat, &accept_token);
++
++    (void)gss_delete_sec_context(&min_stat, &accept_context, NULL);
++    (void)gss_delete_sec_context(&min_stat, &init_context, NULL);
++    return 0;
++}
++
++
++static int
++t_gss_handshake_create_both(gss_name_t target_name)
++{
++    /* Check that both init/accept_sec_context() accept empty sec contexts */
++    OM_uint32 maj_stat;
++    OM_uint32 min_stat;
++    gss_OID mech = &mech_krb5;
++    gss_buffer_desc init_token;
++    gss_cred_id_t cred = GSS_C_NO_CREDENTIAL;
++    gss_buffer_desc accept_token;
++    gss_ctx_id_t init_context = GSS_C_NO_CONTEXT;
++    gss_ctx_id_t accept_context = GSS_C_NO_CONTEXT;
++
++    maj_stat = gss_acquire_cred(&min_stat, GSS_C_NO_NAME, 0, GSS_C_NO_OID_SET,
++                                GSS_C_BOTH, &cred, NULL, NULL);
++    check_gsserr("t_gss_handshake_create_both(0)", maj_stat, min_stat);
++
++    maj_stat = gss_create_sec_context(&min_stat, &init_context);
++    check_gsserr("t_gss_handshake_create_both(1)", maj_stat, min_stat);
++
++    maj_stat = gss_create_sec_context(&min_stat, &accept_context);
++    check_gsserr("t_gss_handshake_create_both(2)", maj_stat, min_stat);
++
++    maj_stat = gss_init_sec_context(&min_stat, GSS_C_NO_CREDENTIAL,
++                                    &init_context, target_name, mech, 0, 0,
++                                    GSS_C_NO_CHANNEL_BINDINGS, GSS_C_NO_BUFFER,
++                                    NULL, &init_token, NULL, NULL);
++
++    check_gsserr("t_gss_handshake_create_both(3)", maj_stat, min_stat);
++    assert(maj_stat == GSS_S_COMPLETE);
++
++    maj_stat = gss_accept_sec_context(&min_stat, &accept_context,
++                                      cred, &init_token,
++                                      GSS_C_NO_CHANNEL_BINDINGS, NULL,
++                                      NULL, &accept_token, NULL, NULL, NULL);
++    check_gsserr("t_gss_handshake_create_both(4)", maj_stat, min_stat);
++    assert(maj_stat == GSS_S_COMPLETE);
++
++    (void)gss_release_buffer(&min_stat, &init_token);
++
++    (void)gss_delete_sec_context(&min_stat, &accept_context, NULL);
++    (void)gss_delete_sec_context(&min_stat, &init_context, NULL);
++    return 0;
++}
++
++
++static int
++t_krb5_init_set_req_flags(gss_name_t target_name)
++{
++    /*
++     * Check that req_flags set on the context appear on the context from
++     * init_sec_context.
++     */
++    OM_uint32 maj_stat;
++    OM_uint32 min_stat;
++    gss_OID mech = &mech_krb5;
++    gss_buffer_desc init_token;
++    gss_cred_id_t cred = GSS_C_NO_CREDENTIAL;
++    gss_ctx_id_t init_context = GSS_C_NO_CONTEXT;
++    gss_union_ctx_id_t union_ctx;
++    krb5_gss_ctx_id_t krb5_outer_context;
++
++    maj_stat = gss_acquire_cred(&min_stat, GSS_C_NO_NAME, 0, GSS_C_NO_OID_SET,
++                                GSS_C_BOTH, &cred, NULL, NULL);
++    check_gsserr("t_gss_handshake_create_both(0)", maj_stat, min_stat);
++
++    maj_stat = gss_create_sec_context(&min_stat, &init_context);
++    check_gsserr("t_gss_handshake_create_both(1)", maj_stat, min_stat);
++
++    maj_stat = gss_set_context_flags(&min_stat, init_context,
++                                     GSS_C_SEQUENCE_FLAG, 0);
++    assert(maj_stat == GSS_S_COMPLETE);
++
++    maj_stat = gss_init_sec_context(&min_stat, GSS_C_NO_CREDENTIAL,
++                                    &init_context, target_name, mech, 0, 0,
++                                    GSS_C_NO_CHANNEL_BINDINGS, GSS_C_NO_BUFFER,
++                                    NULL, &init_token, NULL, NULL);
++
++    check_gsserr("t_gss_handshake_create_both(2)", maj_stat, min_stat);
++    assert(maj_stat == GSS_S_COMPLETE);
++
++    union_ctx = (gss_union_ctx_id_t)(init_context);
++    assert(union_ctx != NULL);
++
++    assert(union_ctx->internal_ctx_id != NULL);
++    krb5_outer_context = (krb5_gss_ctx_id_t)(union_ctx->internal_ctx_id);
++
++    assert(krb5_outer_context != NULL);
++
++
++    /*
++     * Assert that our SEQUENCE flag was set correctly.
++     */
++    assert(krb5_outer_context->gss_flags & GSS_C_SEQUENCE_FLAG);
++
++    (void)gss_release_buffer(&min_stat, &init_token);
++    (void)gss_delete_sec_context(&min_stat, &init_context, NULL);
++    return 0;
++}
++
++
++static int
++t_krb5_init_override_set_req_flags(gss_name_t target_name)
++{
++    /*
++     * Check that req_flags set on the context appear on the context from
++     * init_sec_context, but not if they're set on init_sec_context.
++     */
++    OM_uint32 maj_stat;
++    OM_uint32 min_stat;
++    gss_OID mech = &mech_krb5;
++    gss_buffer_desc init_token;
++    gss_cred_id_t cred = GSS_C_NO_CREDENTIAL;
++    gss_ctx_id_t init_context = GSS_C_NO_CONTEXT;
++    gss_union_ctx_id_t union_ctx;
++    krb5_gss_ctx_id_t krb5_outer_context;
++
++    maj_stat = gss_acquire_cred(&min_stat, GSS_C_NO_NAME, 0, GSS_C_NO_OID_SET,
++                                GSS_C_BOTH, &cred, NULL, NULL);
++    check_gsserr("t_gss_handshake_create_both(0)", maj_stat, min_stat);
++
++    maj_stat = gss_create_sec_context(&min_stat, &init_context);
++    check_gsserr("t_gss_handshake_create_both(1)", maj_stat, min_stat);
++
++    maj_stat = gss_set_context_flags(&min_stat, init_context,
++                                     GSS_C_SEQUENCE_FLAG, 0);
++    assert(maj_stat == GSS_S_COMPLETE);
++
++    maj_stat = gss_init_sec_context(&min_stat, GSS_C_NO_CREDENTIAL,
++                                    &init_context, target_name, mech,
++                                    GSS_C_REPLAY_FLAG, 0,
++                                    GSS_C_NO_CHANNEL_BINDINGS, GSS_C_NO_BUFFER,
++                                    NULL, &init_token, NULL, NULL);
++
++    check_gsserr("t_gss_handshake_create_both(2)", maj_stat, min_stat);
++    assert(maj_stat == GSS_S_COMPLETE);
++
++    union_ctx = (gss_union_ctx_id_t)(init_context);
++    assert(union_ctx != NULL);
++
++    assert(union_ctx->internal_ctx_id != NULL);
++    krb5_outer_context = (krb5_gss_ctx_id_t)(union_ctx->internal_ctx_id);
++
++    assert(krb5_outer_context != NULL);
++
++    /*
++     * Assert that our SEQUENCE flag was ignored, and that the replay flag
++     * was set correctly.
++     */
++    assert(krb5_outer_context->gss_flags & GSS_C_REPLAY_FLAG);
++    assert((krb5_outer_context->gss_flags & GSS_C_SEQUENCE_FLAG) == 0);
++
++    (void)gss_release_buffer(&min_stat, &init_token);
++    (void)gss_delete_sec_context(&min_stat, &init_context, NULL);
++    return 0;
++}
++
++
++int
++main(int argc, char *argv[])
++{
++    gss_name_t target_name;
++    OM_uint32 min_stat;
++
++    if (argc != 2) {
++        fprintf(stderr, "Usage: %s targetname\n", argv[0]);
++        return 1;
++    }
++    target_name = import_name(argv[1]);
++
++    assert(t_gss_handshake_create_init(target_name) == 0);
++    printf("t_gss_handshake_create_init... ok\n");
++
++    assert(t_gss_handshake_create_accept(target_name) == 0);
++    printf("t_gss_handshake_create_accept.. ok\n");
++
++    assert(t_gss_handshake_create_both(target_name) == 0);
++    printf("t_gss_handshake_create_both... ok\n");
++
++    assert(t_krb5_init_set_req_flags(target_name) == 0);
++    printf("t_krb5_init_set_req_flags... ok\n");
++
++    assert(t_krb5_init_override_set_req_flags(target_name) == 0);
++    printf("t_krb5_init_override_set_req_flags... ok\n");
++
++    (void)gss_release_name(&min_stat, &target_name);
++    return 0;
++}
+diff --git a/src/tests/gssapi/t_gssapi.py b/src/tests/gssapi/t_gssapi.py
+index e23c936..f09c392 100755
+--- a/src/tests/gssapi/t_gssapi.py
++++ b/src/tests/gssapi/t_gssapi.py
+@@ -213,6 +213,12 @@ if krb5_mech not in out or spnego_mech not in out:
+ # init_sec_context can interpret it.
+ realm.run(['./t_err', 'p:' + realm.host_princ])
+ 
++# Run gss_create_sec_context interop tests.
++realm.run(['./t_create_exchange', 'p:' + realm.host_princ])
++
++# Run chanel binding tests.
++realm.run(['./t_channel_bindings', 'p:' + realm.host_princ]);
++
+ # Test the GSS_KRB5_CRED_NO_CI_FLAGS_X cred option.
+ realm.run(['./t_ciflags', 'p:' + realm.host_princ])
+ 
+diff --git a/src/tests/gssapi/t_spnego.c b/src/tests/gssapi/t_spnego.c
+index 2483228..2904da2 100644
+--- a/src/tests/gssapi/t_spnego.c
++++ b/src/tests/gssapi/t_spnego.c
+@@ -286,7 +286,20 @@ main(int argc, char *argv[])
+     major = gss_set_neg_mechs(&minor, verifier_cred_handle, &mechset_krb5);
+     check_gsserr("gss_set_neg_mechs(acceptor)", major, minor);
+ 
++    major = gss_create_sec_context(&minor, &initiator_context);
++    check_gsserr("gss_create_sec_context(initiator)", major, minor);
++
++    major = gss_create_sec_context(&minor, &acceptor_context);
++    check_gsserr("gss_create_sec_context(acceptor)", major, minor);
++
+     flags = GSS_C_REPLAY_FLAG | GSS_C_SEQUENCE_FLAG;
++
++    major = gss_set_context_flags(&minor, initiator_context, flags, flags);
++    check_gsserr("gss_set_context_flags(initiator)", major, minor);
++
++    major = gss_set_context_flags(&minor, acceptor_context, flags, flags);
++    check_gsserr("gss_set_context_flags(acceptor)", major, minor);
++
+     establish_contexts(&mech_spnego, initiator_cred_handle,
+                        verifier_cred_handle, target_name, flags,
+                        &initiator_context, &acceptor_context, &source_name,
+-- 
+2.9.4
+

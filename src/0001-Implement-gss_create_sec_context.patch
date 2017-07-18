@@ -1,0 +1,1061 @@
+From c6c4774dc245239f6fc2b8b1dc6c6f42b6bb09b2 Mon Sep 17 00:00:00 2001
+From: Alexander Scheel <ascheel@redhat.com>
+Date: Fri, 23 Jun 2017 12:46:58 -0400
+Subject: [PATCH 1/6] Implement gss_create_sec_context()
+
+This commit implements gss_create_sec_context() in the
+mechglue, krb5, iakerb, and spnego mechanisms.
+---
+ src/lib/gssapi/generic/gssapi_ext.h            |  11 ++
+ src/lib/gssapi/krb5/Makefile.in                |   3 +
+ src/lib/gssapi/krb5/accept_sec_context.c       |  50 ++++-----
+ src/lib/gssapi/krb5/create_sec_context.c       |  28 +++++
+ src/lib/gssapi/krb5/gssapiP_krb5.h             |  13 +++
+ src/lib/gssapi/krb5/gssapi_krb5.c              |   2 +
+ src/lib/gssapi/krb5/iakerb.c                   |  53 ++++++----
+ src/lib/gssapi/krb5/init_sec_context.c         |  26 ++---
+ src/lib/gssapi/libgssapi_krb5.exports          |   1 +
+ src/lib/gssapi/mechglue/Makefile.in            |   3 +
+ src/lib/gssapi/mechglue/g_accept_sec_context.c |  39 ++++---
+ src/lib/gssapi/mechglue/g_create_sec_context.c |  44 ++++++++
+ src/lib/gssapi/mechglue/g_delete_sec_context.c |   8 +-
+ src/lib/gssapi/mechglue/g_imp_sec_context.c    |   2 +-
+ src/lib/gssapi/mechglue/g_init_sec_context.c   |  43 +++++---
+ src/lib/gssapi/mechglue/g_initialize.c         |   4 +
+ src/lib/gssapi/mechglue/mglueP.h               |   9 ++
+ src/lib/gssapi/spnego/gssapiP_spnego.h         |  10 ++
+ src/lib/gssapi/spnego/spnego_mech.c            | 135 +++++++++++++++++--------
+ 19 files changed, 347 insertions(+), 137 deletions(-)
+ create mode 100644 src/lib/gssapi/krb5/create_sec_context.c
+ create mode 100644 src/lib/gssapi/mechglue/g_create_sec_context.c
+
+diff --git a/src/lib/gssapi/generic/gssapi_ext.h b/src/lib/gssapi/generic/gssapi_ext.h
+index 9ad4421..b327a75 100644
+--- a/src/lib/gssapi/generic/gssapi_ext.h
++++ b/src/lib/gssapi/generic/gssapi_ext.h
+@@ -571,6 +571,17 @@ gss_import_cred(
+     gss_buffer_t,              /* token */
+     gss_cred_id_t *);          /* cred_handle */
+ 
++
++/*
++ * Channel Binding Extensions
++ * https://tools.ietf.org/html/draft-ietf-kitten-channel-bound-flag-01
++ */
++
++OM_uint32 KRB5_CALLCONV
++gss_create_sec_context(
++    OM_uint32 *,                /* minor_status */
++    gss_ctx_id_t *);            /* context */
++
+ #ifdef __cplusplus
+ }
+ #endif
+diff --git a/src/lib/gssapi/krb5/Makefile.in b/src/lib/gssapi/krb5/Makefile.in
+index 364a7a4..1a10ab7 100644
+--- a/src/lib/gssapi/krb5/Makefile.in
++++ b/src/lib/gssapi/krb5/Makefile.in
+@@ -36,6 +36,7 @@ SRCS = \
+ 	$(srcdir)/compare_name.c \
+ 	$(srcdir)/context_time.c \
+ 	$(srcdir)/copy_ccache.c \
++	$(srcdir)/create_sec_context.c \
+ 	$(srcdir)/cred_store.c \
+ 	$(srcdir)/delete_sec_context.c \
+ 	$(srcdir)/disp_name.c \
+@@ -89,6 +90,7 @@ OBJS = \
+ 	$(OUTPRE)compare_name.$(OBJEXT) \
+ 	$(OUTPRE)context_time.$(OBJEXT) \
+ 	$(OUTPRE)copy_ccache.$(OBJEXT) \
++	$(OUTPRE)create_sec_context.$(OBJEXT) \
+ 	$(OUTPRE)cred_store.$(OBJEXT) \
+ 	$(OUTPRE)delete_sec_context.$(OBJEXT) \
+ 	$(OUTPRE)disp_name.$(OBJEXT) \
+@@ -145,6 +147,7 @@ STLIBOBJS = \
+ 	compare_name.o \
+ 	context_time.o \
+ 	copy_ccache.o \
++	create_sec_context.o \
+ 	cred_store.o \
+ 	delete_sec_context.o \
+ 	disp_name.o \
+diff --git a/src/lib/gssapi/krb5/accept_sec_context.c b/src/lib/gssapi/krb5/accept_sec_context.c
+index 580d08c..eb66e40 100644
+--- a/src/lib/gssapi/krb5/accept_sec_context.c
++++ b/src/lib/gssapi/krb5/accept_sec_context.c
+@@ -468,6 +468,8 @@ kg_accept_krb5(minor_status, context_handle,
+     krb5_principal accprinc = NULL;
+     krb5_ap_req *request = NULL;
+ 
++    ctx = (krb5_gss_ctx_id_t)*context_handle;
++
+     code = krb5int_accessor (&kaccess, KRB5INT_ACCESS_VERSION);
+     if (code) {
+         *minor_status = code;
+@@ -865,15 +867,6 @@ kg_accept_krb5(minor_status, context_handle,
+     }
+ 
+     /* create the ctx struct and start filling it in */
+-
+-    if ((ctx = (krb5_gss_ctx_id_rec *) xmalloc(sizeof(krb5_gss_ctx_id_rec)))
+-        == NULL) {
+-        code = ENOMEM;
+-        major_status = GSS_S_FAILURE;
+-        goto fail;
+-    }
+-
+-    memset(ctx, 0, sizeof(krb5_gss_ctx_id_rec));
+     ctx->magic = KG_CONTEXT;
+     ctx->mech_used = (gss_OID) mech_used;
+     ctx->auth_context = auth_context;
+@@ -1188,9 +1181,9 @@ fail:
+ 
+     /* from here on is the real "fail" code */
+ 
+-    if (ctx)
++    if (*context_handle)
+         (void) krb5_gss_delete_sec_context(&tmp_minor_status,
+-                                           (gss_ctx_id_t *) &ctx, NULL);
++                                           context_handle, NULL);
+     if (deleg_cred) { /* free memory associated with the deleg credential */
+         if (deleg_cred->ccache)
+             (void)krb5_cc_close(context, deleg_cred->ccache);
+@@ -1288,26 +1281,25 @@ krb5_gss_accept_sec_context_ext(
+      * non-established, but currently, accept_sec_context never returns
+      * a non-established context handle.
+      */
+-    /*SUPPRESS 29*/
+-    if (ctx != NULL) {
+-        if (ctx->established == 0 && (ctx->gss_flags & GSS_C_DCE_STYLE)) {
+-            return kg_accept_dce(minor_status, context_handle,
+-                                 verifier_cred_handle, input_token,
+-                                 input_chan_bindings, src_name, mech_type,
+-                                 output_token, ret_flags, time_rec,
+-                                 delegated_cred_handle);
+-        } else {
+-            *minor_status = EINVAL;
+-            save_error_string(EINVAL, "accept_sec_context called with existing context handle");
+-            return GSS_S_FAILURE;
+-        }
++    if (KRB5INT_CHK_EMPTY(ctx)) {
++        return kg_accept_krb5(minor_status, context_handle,
++                              verifier_cred_handle, input_token,
++                              input_chan_bindings, src_name, mech_type,
++                              output_token, ret_flags, time_rec,
++                              delegated_cred_handle, exts);
++    }
++
++    if (ctx->established == 0 && ctx->gss_flags & GSS_C_DCE_STYLE) {
++        return kg_accept_dce(minor_status, context_handle,
++                             verifier_cred_handle, input_token,
++                             input_chan_bindings, src_name, mech_type,
++                             output_token, ret_flags, time_rec,
++                             delegated_cred_handle);
+     }
+ 
+-    return kg_accept_krb5(minor_status, context_handle,
+-                          verifier_cred_handle, input_token,
+-                          input_chan_bindings, src_name, mech_type,
+-                          output_token, ret_flags, time_rec,
+-                          delegated_cred_handle, exts);
++    *minor_status = EINVAL;
++    save_error_string(EINVAL, "accept_sec_context called with existing context handle");
++    return GSS_S_FAILURE;
+ }
+ 
+ OM_uint32 KRB5_CALLCONV
+diff --git a/src/lib/gssapi/krb5/create_sec_context.c b/src/lib/gssapi/krb5/create_sec_context.c
+new file mode 100644
+index 0000000..51a170b
+--- /dev/null
++++ b/src/lib/gssapi/krb5/create_sec_context.c
+@@ -0,0 +1,28 @@
++/* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
++
++#include "k5-int.h"
++#include "gssapiP_krb5.h"
++
++OM_uint32 KRB5_CALLCONV
++krb5_gss_create_sec_context(OM_uint32 *minor_status, gss_ctx_id_t *context)
++{
++    krb5_gss_ctx_id_rec *ctx;
++    if (context == NULL)
++        return GSS_S_FAILURE;
++
++    ctx = calloc(1, sizeof(krb5_gss_ctx_id_rec));
++    if (ctx == NULL) {
++        if (minor_status != NULL)
++            *minor_status = ENOMEM;
++        return GSS_S_FAILURE;
++    }
++
++    ctx->magic = KG_CONTEXT;
++
++    *context = (gss_ctx_id_t)ctx;
++
++    if (minor_status != NULL)
++        *minor_status = 0;
++
++    return GSS_S_COMPLETE;
++}
+diff --git a/src/lib/gssapi/krb5/gssapiP_krb5.h b/src/lib/gssapi/krb5/gssapiP_krb5.h
+index d7bdef7..a36cbbb 100644
+--- a/src/lib/gssapi/krb5/gssapiP_krb5.h
++++ b/src/lib/gssapi/krb5/gssapiP_krb5.h
+@@ -157,6 +157,10 @@ enum qop {
+     GSS_KRB5_CONF_C_QOP_MASK       = 0xff00
+ };
+ 
++/* Macro to augment checking for partially created KRB5 wrapper structs */
++#define KRB5INT_CHK_EMPTY(p) (p != NULL && p->magic == KG_CONTEXT \
++    && p->k5_context == NULL)
++
+ /** internal types **/
+ 
+ typedef struct _krb5_gss_name_rec {
+@@ -621,6 +625,11 @@ OM_uint32 KRB5_CALLCONV krb5_gss_accept_sec_context_ext
+ );
+ #endif /* LEAN_CLIENT */
+ 
++OM_uint32 KRB5_CALLCONV krb5_gss_create_sec_context
++(OM_uint32*,        /* minor_status */
++ gss_ctx_id_t*      /* context */
++);
++
+ OM_uint32 KRB5_CALLCONV krb5_gss_inquire_sec_context_by_oid
+ (OM_uint32*,       /* minor_status */
+  const gss_ctx_id_t,
+@@ -1421,6 +1430,10 @@ iakerb_gss_pseudo_random(OM_uint32 *minor_status, gss_ctx_id_t context_handle,
+                          int prf_key, const gss_buffer_t prf_in,
+                          ssize_t desired_output_len, gss_buffer_t prf_out);
+ 
++OM_uint32 KRB5_CALLCONV
++iakerb_gss_create_sec_context(OM_uint32 *minor_status,
++                              gss_ctx_id_t *context_handle);
++
+ /* Magic string to identify exported krb5 GSS credentials.  Increment this if
+  * the format changes. */
+ #define CRED_EXPORT_MAGIC "K5C1"
+diff --git a/src/lib/gssapi/krb5/gssapi_krb5.c b/src/lib/gssapi/krb5/gssapi_krb5.c
+index 99092cc..49d1228 100644
+--- a/src/lib/gssapi/krb5/gssapi_krb5.c
++++ b/src/lib/gssapi/krb5/gssapi_krb5.c
+@@ -931,6 +931,7 @@ static struct gss_config krb5_mechanism = {
+     krb5_gss_get_mic_iov,
+     krb5_gss_verify_mic_iov,
+     krb5_gss_get_mic_iov_length,
++    krb5_gss_create_sec_context,
+ };
+ 
+ /* Functions which use security contexts or acquire creds are IAKERB-specific;
+@@ -1023,6 +1024,7 @@ static struct gss_config iakerb_mechanism = {
+     iakerb_gss_get_mic_iov,
+     iakerb_gss_verify_mic_iov,
+     iakerb_gss_get_mic_iov_length,
++    iakerb_gss_create_sec_context,
+ };
+ 
+ #ifdef _GSS_STATIC_LINK
+diff --git a/src/lib/gssapi/krb5/iakerb.c b/src/lib/gssapi/krb5/iakerb.c
+index 2dc4d0c..2347744 100644
+--- a/src/lib/gssapi/krb5/iakerb.c
++++ b/src/lib/gssapi/krb5/iakerb.c
+@@ -773,6 +773,32 @@ iakerb_make_exts(iakerb_ctx_id_t ctx, krb5_gss_ctx_ext_rec *exts)
+ }
+ 
+ OM_uint32 KRB5_CALLCONV
++iakerb_gss_create_sec_context(OM_uint32 *minor_status,
++                              gss_ctx_id_t *context_handle)
++{
++    OM_uint32 code;
++    iakerb_ctx_id_t ctx;
++
++    if (minor_status != NULL)
++        *minor_status = 0;
++
++    if (context_handle == NULL)
++        return GSS_S_FAILURE | GSS_S_NO_CONTEXT;
++
++    code = iakerb_alloc_context(&ctx, -1);
++    if (code != 0)
++       return code;
++
++    code = krb5_gss_create_sec_context(minor_status, &ctx->gssc);
++    if (code != GSS_S_COMPLETE)
++        return code;
++
++    *context_handle = (gss_ctx_id_t)ctx;
++
++    return GSS_S_COMPLETE;
++}
++
++OM_uint32 KRB5_CALLCONV
+ iakerb_gss_accept_sec_context(OM_uint32 *minor_status,
+                               gss_ctx_id_t *context_handle,
+                               gss_cred_id_t verifier_cred_handle,
+@@ -787,19 +813,13 @@ iakerb_gss_accept_sec_context(OM_uint32 *minor_status,
+ {
+     OM_uint32 major_status = GSS_S_FAILURE;
+     OM_uint32 code;
+-    iakerb_ctx_id_t ctx;
+-    int initialContextToken = (*context_handle == GSS_C_NO_CONTEXT);
+-
+-    if (initialContextToken) {
+-        code = iakerb_alloc_context(&ctx, 0);
+-        if (code != 0)
+-            goto cleanup;
++    iakerb_ctx_id_t ctx = (iakerb_ctx_id_t)*context_handle;
++    int initialContextToken = ctx->initiate == -1;
+ 
+-    } else
+-        ctx = (iakerb_ctx_id_t)*context_handle;
++    ctx->initiate = 0;
+ 
+     if (iakerb_is_iakerb_token(input_token)) {
+-        if (ctx->gssc != GSS_C_NO_CONTEXT) {
++        if (!KRB5INT_CHK_EMPTY(((krb5_gss_ctx_id_rec *)ctx->gssc))) {
+             /* We shouldn't get an IAKERB token now. */
+             code = G_WRONG_TOKID;
+             major_status = GSS_S_DEFECTIVE_TOKEN;
+@@ -876,18 +896,14 @@ iakerb_gss_init_sec_context(OM_uint32 *minor_status,
+ {
+     OM_uint32 major_status = GSS_S_FAILURE;
+     krb5_error_code code;
+-    iakerb_ctx_id_t ctx;
++    iakerb_ctx_id_t ctx = (iakerb_ctx_id_t)*context_handle;
+     krb5_gss_cred_id_t kcred;
+     krb5_gss_name_t kname;
+     krb5_boolean cred_locked = FALSE;
+-    int initialContextToken = (*context_handle == GSS_C_NO_CONTEXT);
++    int initialContextToken = ctx->initiate == -1;
+ 
++    ctx->initiate = 1;
+     if (initialContextToken) {
+-        code = iakerb_alloc_context(&ctx, 1);
+-        if (code != 0) {
+-            *minor_status = code;
+-            goto cleanup;
+-        }
+         if (claimant_cred_handle == GSS_C_NO_CREDENTIAL) {
+             major_status = iakerb_gss_acquire_cred(minor_status, NULL,
+                                                    GSS_C_INDEFINITE,
+@@ -899,7 +915,6 @@ iakerb_gss_init_sec_context(OM_uint32 *minor_status,
+             claimant_cred_handle = ctx->defcred;
+         }
+     } else {
+-        ctx = (iakerb_ctx_id_t)*context_handle;
+         if (claimant_cred_handle == GSS_C_NO_CREDENTIAL)
+             claimant_cred_handle = ctx->defcred;
+     }
+@@ -951,7 +966,7 @@ iakerb_gss_init_sec_context(OM_uint32 *minor_status,
+ 
+         iakerb_make_exts(ctx, &exts);
+ 
+-        if (ctx->gssc == GSS_C_NO_CONTEXT)
++        if (KRB5INT_CHK_EMPTY(((krb5_gss_ctx_id_rec *)ctx->gssc)))
+             input_token = GSS_C_NO_BUFFER;
+ 
+         /* IAKERB is finished, or we skipped to Kerberos directly. */
+diff --git a/src/lib/gssapi/krb5/init_sec_context.c b/src/lib/gssapi/krb5/init_sec_context.c
+index 70f7955..1e21502 100644
+--- a/src/lib/gssapi/krb5/init_sec_context.c
++++ b/src/lib/gssapi/krb5/init_sec_context.c
+@@ -502,9 +502,9 @@ kg_new_connection(
+     krb5_gss_ctx_ext_t exts)
+ {
+     OM_uint32 major_status;
+-    krb5_error_code code;
++    krb5_error_code code = 0;
+     krb5_creds *k_cred = NULL;
+-    krb5_gss_ctx_id_rec *ctx, *ctx_free;
++    krb5_gss_ctx_id_rec *ctx, *ctx_free = NULL;
+     krb5_timestamp now;
+     gss_buffer_desc token;
+     krb5_keyblock *keyblock;
+@@ -519,27 +519,20 @@ kg_new_connection(
+     if ((cred->usage != GSS_C_INITIATE) &&
+         (cred->usage != GSS_C_BOTH)) {
+         *minor_status = 0;
+-        return(GSS_S_NO_CRED);
++        major_status = GSS_S_NO_CRED;
++        goto cleanup;
+     }
+ 
+     /* complain if the input token is non-null */
+ 
+     if (input_token != GSS_C_NO_BUFFER && input_token->length != 0) {
+         *minor_status = 0;
+-        return(GSS_S_DEFECTIVE_TOKEN);
+-    }
+-
+-    /* create the ctx */
+-
+-    if ((ctx = (krb5_gss_ctx_id_rec *) xmalloc(sizeof(krb5_gss_ctx_id_rec)))
+-        == NULL) {
+-        *minor_status = ENOMEM;
+-        return(GSS_S_FAILURE);
++        major_status = GSS_S_DEFECTIVE_TOKEN;
++        goto cleanup;
+     }
+ 
+     /* fill in the ctx */
+-    memset(ctx, 0, sizeof(krb5_gss_ctx_id_rec));
+-    ctx->magic = KG_CONTEXT;
++    ctx = (krb5_gss_ctx_id_t)*context_handle;
+     ctx_free = ctx;
+     if ((code = krb5_auth_con_init(context, &ctx->auth_context)))
+         goto cleanup;
+@@ -696,6 +689,7 @@ cleanup:
+         if (ctx_free->subkey)
+             krb5_k_free_key(context, ctx_free->subkey);
+         xfree(ctx_free);
++        *context_handle = NULL;
+     }
+ 
+     *minor_status = code;
+@@ -918,7 +912,7 @@ krb5_gss_init_sec_context_ext(
+     OM_uint32 major_status;
+     OM_uint32 tmp_min_stat;
+ 
+-    if (*context_handle == GSS_C_NO_CONTEXT) {
++    if (KRB5INT_CHK_EMPTY(((krb5_gss_ctx_id_t)*context_handle))) {
+         kerr = krb5_gss_init_context(&context);
+         if (kerr) {
+             *minor_status = kerr;
+@@ -961,7 +955,7 @@ krb5_gss_init_sec_context_ext(
+     /* is this a new connection or not? */
+ 
+     /*SUPPRESS 29*/
+-    if (*context_handle == GSS_C_NO_CONTEXT) {
++    if (KRB5INT_CHK_EMPTY(((krb5_gss_ctx_id_t)*context_handle))) {
+         /* verify the credential, or use the default */
+         /*SUPPRESS 29*/
+         if (claimant_cred_handle == GSS_C_NO_CREDENTIAL) {
+diff --git a/src/lib/gssapi/libgssapi_krb5.exports b/src/lib/gssapi/libgssapi_krb5.exports
+index 9facb3f..8202486 100644
+--- a/src/lib/gssapi/libgssapi_krb5.exports
++++ b/src/lib/gssapi/libgssapi_krb5.exports
+@@ -53,6 +53,7 @@ gss_complete_auth_token
+ gss_context_time
+ gss_create_empty_buffer_set
+ gss_create_empty_oid_set
++gss_create_sec_context
+ gss_decapsulate_token
+ gss_delete_name_attribute
+ gss_delete_sec_context
+diff --git a/src/lib/gssapi/mechglue/Makefile.in b/src/lib/gssapi/mechglue/Makefile.in
+index 5e1ed6d..543a03e 100644
+--- a/src/lib/gssapi/mechglue/Makefile.in
++++ b/src/lib/gssapi/mechglue/Makefile.in
+@@ -20,6 +20,7 @@ SRCS = \
+ 	$(srcdir)/g_compare_name.c \
+ 	$(srcdir)/g_complete_auth_token.c \
+ 	$(srcdir)/g_context_time.c \
++	$(srcdir)/g_create_sec_context.c \
+ 	$(srcdir)/g_decapsulate_token.c \
+ 	$(srcdir)/g_delete_sec_context.c \
+ 	$(srcdir)/g_del_name_attr.c \
+@@ -84,6 +85,7 @@ OBJS = \
+ 	$(OUTPRE)g_compare_name.$(OBJEXT) \
+ 	$(OUTPRE)g_complete_auth_token.$(OBJEXT) \
+ 	$(OUTPRE)g_context_time.$(OBJEXT) \
++	$(OUTPRE)g_create_sec_context.$(OBJEXT) \
+ 	$(OUTPRE)g_decapsulate_token.$(OBJEXT) \
+ 	$(OUTPRE)g_delete_sec_context.$(OBJEXT) \
+ 	$(OUTPRE)g_del_name_attr.$(OBJEXT) \
+@@ -148,6 +150,7 @@ STLIBOBJS = \
+ 	g_compare_name.o \
+ 	g_complete_auth_token.o \
+ 	g_context_time.o \
++	g_create_sec_context.o \
+ 	g_decapsulate_token.o \
+ 	g_delete_sec_context.o \
+ 	g_del_name_attr.o \
+diff --git a/src/lib/gssapi/mechglue/g_accept_sec_context.c b/src/lib/gssapi/mechglue/g_accept_sec_context.c
+index ddaf874..70c2733 100644
+--- a/src/lib/gssapi/mechglue/g_accept_sec_context.c
++++ b/src/lib/gssapi/mechglue/g_accept_sec_context.c
+@@ -180,8 +180,10 @@ gss_cred_id_t *		d_cred;
+      * value of *context_handle to the union context variable.
+      */
+ 
+-    if(*context_handle == GSS_C_NO_CONTEXT) {
++    union_ctx_id = (gss_union_ctx_id_t)*context_handle;
+ 
++    if (*context_handle == GSS_C_NO_CONTEXT ||
++        (union_ctx_id != NULL && union_ctx_id->internal_ctx_id == NULL)) {
+ 	if (input_token_buffer == GSS_C_NO_BUFFER)
+ 	    return (GSS_S_CALL_INACCESSIBLE_READ);
+ 
+@@ -218,25 +220,39 @@ gss_cred_id_t *		d_cred;
+ 	selected_mech = union_ctx_id->mech_type;
+     }
+ 
++    /* Make a mech selection so we can use it when creating contexts. */
++    mech = gssint_get_mechanism(selected_mech);
++    if (!mech) {
++	status = GSS_S_BAD_MECH;
++	goto error_out;
++    }
++
+     /* Now create a new context if we didn't get one. */
+     if (*context_handle == GSS_C_NO_CONTEXT) {
+-	status = GSS_S_FAILURE;
+-	union_ctx_id = (gss_union_ctx_id_t)
+-	    malloc(sizeof(gss_union_ctx_id_desc));
++	union_ctx_id = calloc(1, sizeof(gss_union_ctx_id_desc));
+ 	if (!union_ctx_id)
+ 	    return (GSS_S_FAILURE);
+ 
+ 	union_ctx_id->loopback = union_ctx_id;
+ 	union_ctx_id->internal_ctx_id = GSS_C_NO_CONTEXT;
++	/* set the new context handle to caller's data */
++	*context_handle = (gss_ctx_id_t)union_ctx_id;
++    }
++
++    if (union_ctx_id->internal_ctx_id == NULL) {
+ 	status = generic_gss_copy_oid(&temp_minor_status, selected_mech,
+ 				      &union_ctx_id->mech_type);
+ 	if (status != GSS_S_COMPLETE) {
+-	    free(union_ctx_id);
+-	    return (status);
++	    goto error_out;
+ 	}
+ 
+-	/* set the new context handle to caller's data */
+-	*context_handle = (gss_ctx_id_t)union_ctx_id;
++	if (mech->gss_create_sec_context != NULL) {
++	    status = mech->gss_create_sec_context(
++	        &temp_minor_status,
++	        &union_ctx_id->internal_ctx_id);
++	    if (status != GSS_S_COMPLETE)
++		goto error_out;
++	}
+     }
+ 
+     /*
+@@ -256,12 +272,7 @@ gss_cred_id_t *		d_cred;
+ 	goto error_out;
+     }
+ 
+-    /*
+-     * now select the approprate underlying mechanism routine and
+-     * call it.
+-     */
+-
+-    mech = gssint_get_mechanism(selected_mech);
++    /* now call the underlying mechanism routine. */
+     if (mech && mech->gss_accept_sec_context) {
+ 
+ 	    status = mech->gss_accept_sec_context(minor_status,
+diff --git a/src/lib/gssapi/mechglue/g_create_sec_context.c b/src/lib/gssapi/mechglue/g_create_sec_context.c
+new file mode 100644
+index 0000000..e844d32
+--- /dev/null
++++ b/src/lib/gssapi/mechglue/g_create_sec_context.c
+@@ -0,0 +1,44 @@
++/*
++ *  glue routine for gss_create_sec_context
++ */
++
++#include "mglueP.h"
++#ifdef HAVE_STDLIB_H
++#include <stdlib.h>
++#endif
++#include <string.h>
++#include <errno.h>
++#include <time.h>
++
++/*
++ * Defined:
++ * https://tools.ietf.org/html/draft-ietf-kitten-channel-bound-flag-01
++ *
++ * Section 2.1
++ *
++ * See src/lib/gssapi/generic/gssapi_ext.h for type definitions.
++ */
++OM_uint32 KRB5_CALLCONV
++gss_create_sec_context(OM_uint32 *minor_status, gss_ctx_id_t *context)
++{
++    gss_union_ctx_id_t union_ctx;
++
++    if (context == NULL)
++        return GSS_S_FAILURE;
++
++    union_ctx = calloc(1, sizeof(gss_union_ctx_id_desc));
++    if (union_ctx == NULL) {
++        if (minor_status != NULL)
++            *minor_status = ENOMEM;
++        return GSS_S_UNAVAILABLE;
++    }
++
++    union_ctx->loopback = union_ctx;
++
++    *context = (gss_ctx_id_t)union_ctx;
++
++    if (minor_status != NULL)
++        *minor_status = 0;
++
++    return GSS_S_COMPLETE;
++}
+diff --git a/src/lib/gssapi/mechglue/g_delete_sec_context.c b/src/lib/gssapi/mechglue/g_delete_sec_context.c
+index 4bf0dec..995a41f 100644
+--- a/src/lib/gssapi/mechglue/g_delete_sec_context.c
++++ b/src/lib/gssapi/mechglue/g_delete_sec_context.c
+@@ -94,9 +94,11 @@ gss_buffer_t		output_token;
+     if (status)
+ 	return status;
+ 
+-    /* now free up the space for the union context structure */
+-    free(ctx->mech_type->elements);
+-    free(ctx->mech_type);
++    if (ctx->mech_type != GSS_C_NO_OID) {
++	free(ctx->mech_type->elements);
++	free(ctx->mech_type);
++    }
++
+     free(*context_handle);
+     *context_handle = GSS_C_NO_CONTEXT;
+ 
+diff --git a/src/lib/gssapi/mechglue/g_imp_sec_context.c b/src/lib/gssapi/mechglue/g_imp_sec_context.c
+index a0e2d71..628e5c7 100644
+--- a/src/lib/gssapi/mechglue/g_imp_sec_context.c
++++ b/src/lib/gssapi/mechglue/g_imp_sec_context.c
+@@ -97,7 +97,7 @@ gss_ctx_id_t *		context_handle;
+     /* Initial value needed below. */
+     status = GSS_S_FAILURE;
+ 
+-    ctx = (gss_union_ctx_id_t) malloc(sizeof(gss_union_ctx_id_desc));
++    ctx = calloc(1, sizeof(gss_union_ctx_id_desc));
+     if (!ctx)
+ 	return (GSS_S_FAILURE);
+ 
+diff --git a/src/lib/gssapi/mechglue/g_init_sec_context.c b/src/lib/gssapi/mechglue/g_init_sec_context.c
+index 9f154b8..509b936 100644
+--- a/src/lib/gssapi/mechglue/g_init_sec_context.c
++++ b/src/lib/gssapi/mechglue/g_init_sec_context.c
+@@ -177,23 +177,34 @@ OM_uint32 *		time_rec;
+      * value of *context_handle to the union context variable.
+      */
+ 
+-    if(*context_handle == GSS_C_NO_CONTEXT) {
++    if (*context_handle == GSS_C_NO_CONTEXT) {
+ 	status = GSS_S_FAILURE;
+-	union_ctx_id = (gss_union_ctx_id_t)
+-	    malloc(sizeof(gss_union_ctx_id_desc));
++	union_ctx_id = calloc(1, sizeof(gss_union_ctx_id_desc));
+ 	if (union_ctx_id == NULL)
+ 	    goto end;
++	/* copy the supplied context handle */
++	union_ctx_id->internal_ctx_id = GSS_C_NO_CONTEXT;
++	union_ctx_id->loopback = union_ctx_id;
++    } else
++	union_ctx_id = (gss_union_ctx_id_t)*context_handle;
++
++
++    if (union_ctx_id->internal_ctx_id == NULL) {
++	status = GSS_S_FAILURE;
+ 
+ 	if (generic_gss_copy_oid(&temp_minor_status, selected_mech,
+-				 &union_ctx_id->mech_type) != GSS_S_COMPLETE) {
+-	    free(union_ctx_id);
++	                         &union_ctx_id->mech_type) != GSS_S_COMPLETE) {
+ 	    goto end;
+ 	}
+ 
+-	/* copy the supplied context handle */
+-	union_ctx_id->internal_ctx_id = GSS_C_NO_CONTEXT;
+-    } else
+-	union_ctx_id = (gss_union_ctx_id_t)*context_handle;
++	if (mech->gss_create_sec_context != NULL) {
++	    status = mech->gss_create_sec_context(
++	        &temp_minor_status,
++	        &union_ctx_id->internal_ctx_id);
++	    if (status != GSS_S_COMPLETE)
++		goto end;
++	}
++    }
+ 
+     /*
+      * get the appropriate cred handle from the union cred struct.
+@@ -222,6 +233,7 @@ OM_uint32 *		time_rec;
+ 	ret_flags,
+ 	time_rec);
+ 
++end:
+     if (status != GSS_S_COMPLETE && status != GSS_S_CONTINUE_NEEDED) {
+ 	/*
+ 	 * The spec says the preferred method is to delete all context info on
+@@ -233,9 +245,17 @@ OM_uint32 *		time_rec;
+ 	map_error(minor_status, mech);
+ 	if (union_ctx_id->internal_ctx_id == GSS_C_NO_CONTEXT)
+ 	    *context_handle = GSS_C_NO_CONTEXT;
++
+ 	if (*context_handle == GSS_C_NO_CONTEXT) {
+-	    free(union_ctx_id->mech_type->elements);
+-	    free(union_ctx_id->mech_type);
++	    if (mech)
++		mech->gss_delete_sec_context(&temp_minor_status,
++		                             &union_ctx_id->internal_ctx_id,
++		                             output_token);
++
++	    if (union_ctx_id->mech_type != GSS_C_NO_OID) {
++		free(union_ctx_id->mech_type->elements);
++		free(union_ctx_id->mech_type);
++	    }
+ 	    free(union_ctx_id);
+ 	}
+     } else if (*context_handle == GSS_C_NO_CONTEXT) {
+@@ -243,7 +263,6 @@ OM_uint32 *		time_rec;
+ 	*context_handle = (gss_ctx_id_t)union_ctx_id;
+     }
+ 
+-end:
+     if (union_name->mech_name == NULL ||
+ 	union_name->mech_name != internal_name) {
+ 	(void) gssint_release_internal_name(&temp_minor_status,
+diff --git a/src/lib/gssapi/mechglue/g_initialize.c b/src/lib/gssapi/mechglue/g_initialize.c
+index 9197666..815d00b 100644
+--- a/src/lib/gssapi/mechglue/g_initialize.c
++++ b/src/lib/gssapi/mechglue/g_initialize.c
+@@ -763,6 +763,8 @@ build_dynamicMech(void *dl, const gss_OID mech_type)
+ 	GSS_ADD_DYNAMIC_METHOD(dl, mech, gssspi_import_sec_context_by_mech);
+ 	GSS_ADD_DYNAMIC_METHOD(dl, mech, gssspi_import_name_by_mech);
+ 	GSS_ADD_DYNAMIC_METHOD(dl, mech, gssspi_import_cred_by_mech);
++	/* draft-ietf-kitten-channel-bound-flag */
++	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_create_sec_context);
+ 
+ 	assert(mech_type != GSS_C_NO_OID);
+ 
+@@ -867,6 +869,8 @@ build_interMech(void *dl, const gss_OID mech_type)
+ 	RESOLVE_GSSI_SYMBOL(dl, mech, gssspi, _import_sec_context_by_mech);
+ 	RESOLVE_GSSI_SYMBOL(dl, mech, gssspi, _import_name_by_mech);
+ 	RESOLVE_GSSI_SYMBOL(dl, mech, gssspi, _import_cred_by_mech);
++	/* draft-ietf-kitten-channel-bound-flag */
++	RESOLVE_GSSI_SYMBOL(dl, mech, gss, _create_sec_context);
+ 
+ 	mech->mech_type = *mech_type;
+ 	return mech;
+diff --git a/src/lib/gssapi/mechglue/mglueP.h b/src/lib/gssapi/mechglue/mglueP.h
+index 2b5145e..2c8232c 100644
+--- a/src/lib/gssapi/mechglue/mglueP.h
++++ b/src/lib/gssapi/mechglue/mglueP.h
+@@ -702,6 +702,15 @@ typedef struct gss_config {
+ 	    int				/* iov_count */
+ 	);
+ 
++	/* Channel binding signalling extensions */
++	/* https://tools.ietf.org/html/draft-ietf-kitten-channel-bound-flag-01 */
++
++	OM_uint32       (KRB5_CALLCONV *gss_create_sec_context)
++	(
++	    OM_uint32 *,                /* minor_status */
++	    gss_ctx_id_t *              /* context */
++	);
++
+ } *gss_mechanism;
+ 
+ /*
+diff --git a/src/lib/gssapi/spnego/gssapiP_spnego.h b/src/lib/gssapi/spnego/gssapiP_spnego.h
+index 84c63fc..8103b85 100644
+--- a/src/lib/gssapi/spnego/gssapiP_spnego.h
++++ b/src/lib/gssapi/spnego/gssapiP_spnego.h
+@@ -49,6 +49,10 @@ extern "C" {
+ #define	ERR_SPNEGO_NEGOTIATION_FAILED		0x20000004
+ #define	ERR_SPNEGO_NO_TOKEN_FROM_ACCEPTOR	0x20000005
+ 
++#define SPNEGOINT_CHK_EMPTY(p) ((p != NULL) \
++                                && p->magic_num == SPNEGO_MAGIC_ID \
++                                && p->ctx_handle == NULL)
++
+ /*
+  * send_token_flag is used to indicate in later steps what type
+  * of token, if any should be sent or processed.
+@@ -657,6 +661,12 @@ spnego_gss_get_mic_iov_length(
+ 	int iov_count
+ );
+ 
++OM_uint32 KRB5_CALLCONV
++spnego_gss_create_sec_context(
++	OM_uint32 *minor_status,
++	gss_ctx_id_t *context
++);
++
+ #ifdef	__cplusplus
+ }
+ #endif
+diff --git a/src/lib/gssapi/spnego/spnego_mech.c b/src/lib/gssapi/spnego/spnego_mech.c
+index 9d6027c..2359daf 100644
+--- a/src/lib/gssapi/spnego/spnego_mech.c
++++ b/src/lib/gssapi/spnego/spnego_mech.c
+@@ -101,6 +101,7 @@ static OM_uint32 get_available_mechs(OM_uint32 *, gss_name_t, gss_cred_usage_t,
+ static OM_uint32 get_negotiable_mechs(OM_uint32 *, spnego_gss_cred_id_t,
+ 				      gss_cred_usage_t, gss_OID_set *);
+ static void release_spnego_ctx(spnego_gss_ctx_id_t *);
++static void clean_spnego_ctx(spnego_gss_ctx_id_t *);
+ static spnego_gss_ctx_id_t create_spnego_ctx(int);
+ static int put_mech_set(gss_OID_set mechSet, gss_buffer_t buf);
+ static int put_input_token(unsigned char **, gss_buffer_t, unsigned int);
+@@ -280,7 +281,8 @@ static struct gss_config spnego_mechanism =
+ 	NULL,				/* gssspi_import_cred_by_mech */
+ 	spnego_gss_get_mic_iov,
+ 	spnego_gss_verify_mic_iov,
+-	spnego_gss_get_mic_iov_length
++	spnego_gss_get_mic_iov_length,
++	spnego_gss_create_sec_context,
+ };
+ 
+ #ifdef _GSS_STATIC_LINK
+@@ -448,28 +450,13 @@ static spnego_gss_ctx_id_t
+ create_spnego_ctx(int initiate)
+ {
+ 	spnego_gss_ctx_id_t spnego_ctx = NULL;
+-	spnego_ctx = (spnego_gss_ctx_id_t)
+-		malloc(sizeof (spnego_gss_ctx_id_rec));
++	spnego_ctx = calloc(1, sizeof(spnego_gss_ctx_id_rec));
+ 
+ 	if (spnego_ctx == NULL) {
+ 		return (NULL);
+ 	}
+ 
+ 	spnego_ctx->magic_num = SPNEGO_MAGIC_ID;
+-	spnego_ctx->ctx_handle = GSS_C_NO_CONTEXT;
+-	spnego_ctx->mech_set = NULL;
+-	spnego_ctx->internal_mech = NULL;
+-	spnego_ctx->DER_mechTypes.length = 0;
+-	spnego_ctx->DER_mechTypes.value = NULL;
+-	spnego_ctx->mic_reqd = 0;
+-	spnego_ctx->mic_sent = 0;
+-	spnego_ctx->mic_rcvd = 0;
+-	spnego_ctx->mech_complete = 0;
+-	spnego_ctx->nego_done = 0;
+-	spnego_ctx->opened = 0;
+-	spnego_ctx->initiate = initiate;
+-	spnego_ctx->internal_name = GSS_C_NO_NAME;
+-	spnego_ctx->actual_mech = GSS_C_NO_OID;
+ 
+ 	return (spnego_ctx);
+ }
+@@ -673,11 +660,8 @@ init_ctx_new(OM_uint32 *minor_status,
+ 	OM_uint32 ret;
+ 	spnego_gss_ctx_id_t sc = NULL;
+ 
+-	*sc_out = NULL;
+-
+-	sc = create_spnego_ctx(1);
+-	if (sc == NULL)
+-		return GSS_S_FAILURE;
++	sc = *sc_out;
++	sc->initiate = 1;
+ 
+ 	/* determine negotiation mech set */
+ 	ret = get_negotiable_mechs(minor_status, spcred, GSS_C_INITIATE,
+@@ -700,7 +684,11 @@ init_ctx_new(OM_uint32 *minor_status,
+ 	ret = GSS_S_CONTINUE_NEEDED;
+ 
+ cleanup:
+-	release_spnego_ctx(&sc);
++	if (sc != NULL) {
++		release_spnego_ctx(&sc);
++		sc_out = NULL;
++	}
++
+ 	return ret;
+ }
+ 
+@@ -919,6 +907,12 @@ init_ctx_call_init(OM_uint32 *minor_status,
+ 	if (spcred == NULL || !spcred->no_ask_integ)
+ 		mech_req_flags |= GSS_C_INTEG_FLAG;
+ 
++	if (SPNEGOINT_CHK_EMPTY(sc)) {
++		ret = gss_create_sec_context(minor_status, &sc->ctx_handle);
++		if (ret != GSS_S_COMPLETE)
++			return ret;
++	}
++
+ 	ret = gss_init_sec_context(minor_status,
+ 				   mcred,
+ 				   &sc->ctx_handle,
+@@ -1067,13 +1061,10 @@ spnego_gss_init_sec_context(
+ 	/* Step 1: perform mechanism negotiation. */
+ 	spcred = (spnego_gss_cred_id_t)claimant_cred_handle;
+ 	spnego_ctx = (spnego_gss_ctx_id_t)*context_handle;
+-	if (spnego_ctx == NULL) {
++
++	if (SPNEGOINT_CHK_EMPTY(spnego_ctx)) {
+ 		ret = init_ctx_new(minor_status, spcred, &send_token,
+ 				   &spnego_ctx);
+-		if (ret != GSS_S_CONTINUE_NEEDED) {
+-			goto cleanup;
+-		}
+-		*context_handle = (gss_ctx_id_t)spnego_ctx;
+ 	} else {
+ 		ret = init_ctx_cont(minor_status, spnego_ctx,
+ 				    input_token, &mechtok_in,
+@@ -1285,12 +1276,15 @@ acc_ctx_hints(OM_uint32 *minor_status,
+ 	gss_OID_set supported_mechSet;
+ 	spnego_gss_ctx_id_t sc = NULL;
+ 
++	if (*sc_out == NULL)
++		return GSS_S_FAILURE;
++
++	sc = *sc_out;
+ 	*mechListMIC = GSS_C_NO_BUFFER;
+ 	supported_mechSet = GSS_C_NO_OID_SET;
+ 	*return_token = NO_TOKEN_SEND;
+ 	*negState = REJECT;
+ 	*minor_status = 0;
+-	*sc_out = NULL;
+ 
+ 	ret = get_negotiable_mechs(minor_status, spcred, GSS_C_ACCEPT,
+ 				   &supported_mechSet);
+@@ -1301,7 +1295,7 @@ acc_ctx_hints(OM_uint32 *minor_status,
+ 	if (ret != GSS_S_COMPLETE)
+ 		goto cleanup;
+ 
+-	sc = create_spnego_ctx(0);
++	sc->initiate = 0;
+ 	if (sc == NULL) {
+ 		ret = GSS_S_FAILURE;
+ 		goto cleanup;
+@@ -1357,6 +1351,11 @@ acc_ctx_new(OM_uint32 *minor_status,
+ 	*negState = REJECT;
+ 	*minor_status = 0;
+ 
++	if (sc_out == NULL)
++		return GSS_S_FAILURE;
++
++	sc = *sc_out;
++
+ 	ret = get_negTokenInit(minor_status, buf, &der_mechTypes,
+ 			       &mechTypes, &req_flags,
+ 			       mechToken, mechListMIC);
+@@ -1379,12 +1378,8 @@ acc_ctx_new(OM_uint32 *minor_status,
+ 		ret = GSS_S_BAD_MECH;
+ 		goto cleanup;
+ 	}
+-	sc = create_spnego_ctx(0);
+-	if (sc == NULL) {
+-		ret = GSS_S_FAILURE;
+-		*return_token = NO_TOKEN_SEND;
+-		goto cleanup;
+-	}
++
++	sc->initiate = 0;
+ 	sc->mech_set = mechTypes;
+ 	mechTypes = GSS_C_NO_OID_SET;
+ 	sc->internal_mech = mech_wanted;
+@@ -1554,6 +1549,10 @@ acc_ctx_call_acc(OM_uint32 *minor_status, spnego_gss_ctx_id_t sc,
+ 				      negState, tokflag);
+ 		if (ret != GSS_S_COMPLETE)
+ 			return ret;
++
++		ret = gss_create_sec_context(minor_status, &sc->ctx_handle);
++		if (ret != GSS_S_COMPLETE)
++			return ret;
+ 	}
+ 
+ 	mcred = (spcred == NULL) ? GSS_C_NO_CREDENTIAL : spcred->mcred;
+@@ -1679,7 +1678,7 @@ spnego_gss_accept_sec_context(
+ 	/* Step 1: Perform mechanism negotiation. */
+ 	sc = (spnego_gss_ctx_id_t)*context_handle;
+ 	spcred = (spnego_gss_cred_id_t)verifier_cred_handle;
+-	if (sc == NULL && input_token->length == 0) {
++	if (SPNEGOINT_CHK_EMPTY(sc) && input_token->length == 0) {
+ 		/* Process a request for NegHints. */
+ 		ret = acc_ctx_hints(minor_status, spcred, &mic_out, &negState,
+ 				    &return_token, &sc);
+@@ -1688,10 +1687,11 @@ spnego_gss_accept_sec_context(
+ 		*context_handle = (gss_ctx_id_t)sc;
+ 		sendTokenInit = 1;
+ 		ret = GSS_S_CONTINUE_NEEDED;
+-	} else if (sc == NULL || sc->internal_mech == GSS_C_NO_OID) {
+-		if (sc != NULL) {
+-			/* Discard the context from the NegHints request. */
+-			release_spnego_ctx(&sc);
++	} else if (SPNEGOINT_CHK_EMPTY(sc) ||
++	           sc->internal_mech == GSS_C_NO_OID) {
++		if (SPNEGOINT_CHK_EMPTY(sc)) {
++			/* Discard the contents from the NegHints request. */
++			clean_spnego_ctx(&sc);
+ 			*context_handle = GSS_C_NO_CONTEXT;
+ 		}
+ 		/* Process an initial token; can set negState to
+@@ -1770,9 +1770,8 @@ cleanup:
+ 		if (sc != NULL) {
+ 			gss_delete_sec_context(&tmpmin, &sc->ctx_handle,
+ 					       GSS_C_NO_BUFFER);
+-			release_spnego_ctx(&sc);
++			clean_spnego_ctx(&sc);
+ 		}
+-		*context_handle = GSS_C_NO_CONTEXT;
+ 	}
+ 	gss_release_buffer(&tmpmin, &mechtok_out);
+ 	if (mechtok_in != GSS_C_NO_BUFFER) {
+@@ -3044,6 +3043,22 @@ spnego_gss_get_mic_iov_length(OM_uint32 *minor_status,
+ 				  iov_count);
+ }
+ 
++OM_uint32 KRB5_CALLCONV
++spnego_gss_create_sec_context(OM_uint32 *minor_status,
++                              gss_ctx_id_t *context)
++{
++	spnego_gss_ctx_id_t ctx;
++	if (context == NULL) {
++		return GSS_S_FAILURE;
++	}
++
++	ctx = create_spnego_ctx(0);
++
++	*context = (gss_ctx_id_t)ctx;
++
++	return GSS_S_COMPLETE;
++}
++
+ /*
+  * We will release everything but the ctx_handle so that it
+  * can be passed back to init/accept context. This routine should
+@@ -3070,6 +3085,40 @@ release_spnego_ctx(spnego_gss_ctx_id_t *ctx)
+ 	}
+ }
+ 
++static void
++clean_spnego_ctx(spnego_gss_ctx_id_t *ctx)
++{
++	spnego_gss_ctx_id_t context;
++	OM_uint32 minor_stat;
++	context = *ctx;
++
++	if (context == NULL)
++		return;
++
++	(void)gss_release_buffer(&minor_stat,
++	                         &context->DER_mechTypes);
++
++	gss_release_oid_set(&minor_stat, &context->mech_set);
++
++	gss_release_name(&minor_stat, &context->internal_name);
++
++
++	context->magic_num = SPNEGO_MAGIC_ID;
++	context->ctx_handle = GSS_C_NO_CONTEXT;
++	context->mech_set = NULL;
++	context->internal_mech = NULL;
++	context->DER_mechTypes.length = 0;
++	context->DER_mechTypes.value = NULL;
++	context->mic_reqd = 0;
++	context->mic_sent = 0;
++	context->mic_rcvd = 0;
++	context->mech_complete = 0;
++	context->nego_done = 0;
++	context->opened = 0;
++	context->internal_name = GSS_C_NO_NAME;
++	context->actual_mech = GSS_C_NO_OID;
++}
++
+ /*
+  * Can't use gss_indicate_mechs by itself to get available mechs for
+  * SPNEGO because it will also return the SPNEGO mech and we do not
+-- 
+2.9.4
+
